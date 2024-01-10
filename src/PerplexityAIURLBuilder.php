@@ -35,9 +35,6 @@ final class PerplexityAIURLBuilder
      * @var array<string, array<string, string>> PerplexityAI API endpoints configuration.
      */
     private static array $urlEndpoints = [
-        // Completions: https://docs.perplexity.ai/reference/post_text_completions
-        'createCompletion' => ['method' => self::HTTP_METHOD_POST, 'path' => '/completions'],
-
         // Chat Completions: https://docs.perplexity.ai/reference/post_chat_completions
         'createChatCompletion' => ['method' => self::HTTP_METHOD_POST, 'path' => '/chat/completions'],
     ];

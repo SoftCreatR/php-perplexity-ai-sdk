@@ -11,7 +11,7 @@ return (new PhpCsFixer\Config())
         '@PSR1' => true,
         '@PSR2' => true,
         '@PSR12' => true,
-        '@PER' => true,
+        '@PER-CS' => true,
 
         'array_push' => true,
         'backtick_to_shell_exec' => true,
@@ -22,7 +22,7 @@ return (new PhpCsFixer\Config())
 
         'array_syntax' => ['syntax' => 'short'],
         'no_multiline_whitespace_around_double_arrow' => true,
-        'no_trailing_comma_in_singleline_array' => true,
+        'no_trailing_comma_in_singleline' => true,
         'no_whitespace_before_comma_in_array' => true,
         'normalize_index_brace' => true,
         'whitespace_after_comma_in_array' => true,
@@ -32,7 +32,7 @@ return (new PhpCsFixer\Config())
         'magic_constant_casing' => true,
         'magic_method_casing' => true,
         'native_function_casing' => true,
-        'native_function_type_declaration_casing' => true,
+        'native_type_declaration_casing' => true,
 
         'cast_spaces' => ['space' => 'none'],
         'no_unset_cast' => true,
@@ -48,13 +48,13 @@ return (new PhpCsFixer\Config())
         'native_constant_invocation' => ['strict' => false],
 
         'no_alternative_syntax' => true,
-        'no_trailing_comma_in_list_call' => true,
+        'no_trailing_comma_in_singleline' => true,
         'no_unneeded_control_parentheses' => ['statements' => ['break', 'clone', 'continue', 'echo_print', 'return', 'switch_case', 'yield', 'yield_from']],
-        'no_unneeded_curly_braces' => ['namespaces' => true],
+        'no_unneeded_braces' => ['namespaces' => true],
         'switch_continue_to_break' => true,
         'trailing_comma_in_multiline' => ['elements' => ['arrays']],
 
-        'function_typehint_space' => true,
+        'type_declaration_spaces' => true,
         'lambda_not_used_import' => true,
         'native_function_invocation' => ['include' => ['@internal']],
         'no_unreachable_default_argument_value' => true,

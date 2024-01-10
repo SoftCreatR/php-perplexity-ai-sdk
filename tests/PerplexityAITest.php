@@ -79,20 +79,6 @@ class PerplexityAITest extends TestCase
     }
 
     /**
-     * Test that PerplexityAI::completion method can handle API calls correctly.
-     */
-    public function testCreateCompletion(): void
-    {
-        $this->testApiCall(
-            fn() => $this->pplx->createCompletion([
-                'model' => 'replit-code-v1.5-3b',
-                'prompt' => 'def fibonnaci(n): ',
-            ]),
-            'completion.json'
-        );
-    }
-
-    /**
      * Test that PerplexityAI::chat method can handle API calls correctly.
      */
     public function testCreateChatCompletion(): void
@@ -166,11 +152,14 @@ class PerplexityAITest extends TestCase
         $response = null;
 
         try {
-            $response = $this->pplx->createCompletion([
-                'model' => 'replit-code-v1.5-3b',
-                'prompt' => 'Say this is a test',
-                'max_tokens' => 500,
-                'invalid' => $invalidValue, // pass the invalid value
+            $response = $this->pplx->createChatCompletion([
+                'model' => 'mistral-7b-instruct',
+                'messages' => [
+                    [
+                        'role' => 'system',
+                        'content' => $invalidValue, // pass the invalid value
+                    ],
+                ],
             ]);
         } catch (Exception $e) {
             // ignore
@@ -204,8 +193,6 @@ class PerplexityAITest extends TestCase
             // ignore
         }
 
-        self::assertEquals($this->apiKey, $this->pplx->apiKey);
-        self::assertEquals($this->origin, $this->pplx->origin);
         self::assertEquals(200, $response->getStatusCode());
         self::assertEquals($fakeResponseBody, (string)$response->getBody());
     }

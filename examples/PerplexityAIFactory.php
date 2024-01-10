@@ -27,7 +27,7 @@ class PerplexityAIFactory
     // Replace 'your_api_key' with your actual PerplexityAI API key
     private const API_KEY = 'your_api_key';
 
-    public static function create(string $apiKey = self::API_KEY): PerplexityAI
+    public static function create(#[\SensitiveParameter] string $apiKey = self::API_KEY): PerplexityAI
     {
         $psr17Factory = new HttpFactory();
         $httpClient = new Client();

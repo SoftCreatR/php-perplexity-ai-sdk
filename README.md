@@ -82,10 +82,6 @@ For more details on how to use each endpoint, refer to the [PerplexityAI API doc
 
 ## Supported Methods
 
-### Completions
--   [Create Completion](https://docs.perplexity.ai/reference/post_text_completions) - [Example](https://github.com/SoftCreatR/php-perplexity-ai-sdk/blob/main/examples/completions/createCompletion.php)
-    -   `createCompletion(array $options = [])`
-
 ### Chat Completions
 -   [Create Chat Completion](https://docs.perplexity.ai/reference/post_chat_completions) - [Example](https://github.com/SoftCreatR/php-perplexity-ai-sdk/blob/main/examples/chat/createChatCompletion.php)
     -   `createChatCompletion(array $options = [])`

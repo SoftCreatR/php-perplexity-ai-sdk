@@ -28,6 +28,7 @@ use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamFactoryInterface;
 use Psr\Http\Message\UriFactoryInterface;
 use Psr\Http\Message\UriInterface;
+use SensitiveParameter;
 use SoftCreatR\PerplexityAI\Exception\PerplexityAIException;
 
 use const JSON_THROW_ON_ERROR;
@@ -39,7 +40,6 @@ use const JSON_THROW_ON_ERROR;
  * @property string $origin
  *
  * @method ResponseInterface createChatCompletion(array $options = [])
- * @method ResponseInterface createCompletion(array $options = [])
  */
 class PerplexityAI
 {
@@ -63,11 +63,22 @@ class PerplexityAI
      */
     private UriFactoryInterface $uriFactory;
 
+    /**
+     * PerplexityAI API Key
+     */
+    public string $apiKey = '';
+
+    /**
+     * PerplexityAI API Origin (defaults to api.perplexity.ai)
+     */
+    public string $origin = '';
+
     public function __construct(
         RequestFactoryInterface $requestFactory,
         StreamFactoryInterface $streamFactory,
         UriFactoryInterface $uriFactory,
         ClientInterface $httpClient,
+        #[SensitiveParameter]
         string $apiKey,
         string $origin = ''
     ) {
