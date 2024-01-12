@@ -21,7 +21,6 @@ namespace SoftCreatR\PerplexityAI\Tests;
 use Exception;
 use GuzzleHttp\Psr7\HttpFactory;
 use GuzzleHttp\Psr7\Response;
-use JsonException;
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestInterface;

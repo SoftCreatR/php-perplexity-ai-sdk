@@ -93,7 +93,7 @@ For a detailed list of changes and updates, please refer to the [CHANGELOG.md](h
 ## Known Problems and limitations
 
 ### Streaming Support
-Currently, streaming is not supported in the `createCompletion` and `createChatCompletion` methods. It's planned to address this limitation asap. For now, please be aware that these methods cannot be used for streaming purposes.
+Currently, streaming is not supported. It's planned to address this limitation asap. For now, please be aware that these methods cannot be used for streaming purposes.
 
 If you require streaming functionality, consider using an alternative implementation or keep an eye out for future updates to this library.
 
