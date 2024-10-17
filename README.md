@@ -4,18 +4,18 @@
 
 This PHP library provides a simple wrapper for the PerplexityAI API, allowing you to easily integrate the PerplexityAI API into your PHP projects.
 
-
 ## Features
 
--   Easy integration with PerplexityAI API
--   Supports all PerplexityAI API endpoints
--   Utilizes PSR-17 and PSR-18 compliant HTTP clients, and factories for making API requests
+- Easy integration with PerplexityAI API
+- Supports all PerplexityAI API endpoints
+- Streaming support for real-time responses in chat completions
+- Utilizes PSR-17 and PSR-18 compliant HTTP clients and factories for making API requests
 
 ## Requirements
 
--   PHP 7.4 or higher
--   A PSR-17 HTTP Factory implementation (e.g., [guzzle/psr7](https://github.com/guzzle/psr7) or [nyholm/psr7](https://github.com/Nyholm/psr7))
--   A PSR-18 HTTP Client implementation (e.g., [guzzlehttp/guzzle](https://github.com/guzzle/guzzle) or [symfony/http-client](https://github.com/symfony/http-client))
+- PHP 8.1 or higher
+- A PSR-17 HTTP Factory implementation (e.g., [guzzle/psr7](https://github.com/guzzle/psr7) or [nyholm/psr7](https://github.com/Nyholm/psr7))
+- A PSR-18 HTTP Client implementation (e.g., [guzzlehttp/guzzle](https://github.com/guzzle/guzzle) or [symfony/http-client](https://github.com/symfony/http-client))
 
 ## Installation
 
@@ -35,7 +35,7 @@ First, include the library in your project:
 require_once 'vendor/autoload.php';
 ```
 
-Then, create an instance of the `PerplexityAI` class with your API key, organization (optional), an HTTP client, an HTTP request factory, and an HTTP stream factory:
+Then, create an instance of the `PerplexityAI` class with your API key, an HTTP client, an HTTP request factory, and an HTTP stream factory:
 
 ```php
 use SoftCreatR\PerplexityAI\PerplexityAI;
@@ -55,7 +55,7 @@ Now you can call any supported PerplexityAI API endpoint using the magic method 
 
 ```php
 $response = $pplx->createChatCompletion([
-    'model' => 'mistral-7b-instruct',
+    'model' => 'llama-3.1-sonar-small-128k-online',
     'messages' => [
         [
             'role' => 'system',
@@ -78,13 +78,39 @@ if ($response->getStatusCode() === 200) {
 }
 ```
 
+### Streaming Example
+
+You can enable real-time streaming for chat completions:
+
+```php
+$streamCallback = static function ($data) {
+    if (isset($data['choices'][0]['delta']['content'])) {
+        echo $data['choices'][0]['delta']['content'];
+    }
+};
+
+$pplx->createChatCompletion(
+    [
+        'model' => 'llama-3.1-sonar-small-128k-online',
+        'messages' => [
+            [
+                'role' => 'user',
+                'content' => 'Tell me a story about a brave knight.',
+            ],
+        ],
+        'stream' => true,
+    ],
+    $streamCallback
+);
+```
+
 For more details on how to use each endpoint, refer to the [PerplexityAI API documentation](https://docs.perplexity.ai/reference), and the [examples](https://github.com/SoftCreatR/php-perplexity-ai-sdk/tree/main/examples) provided in the repository.
 
 ## Supported Methods
 
 ### Chat Completions
--   [Create Chat Completion](https://docs.perplexity.ai/reference/post_chat_completions) - [Example](https://github.com/SoftCreatR/php-perplexity-ai-sdk/blob/main/examples/chat/createChatCompletion.php)
-    -   `createChatCompletion(array $options = [])`
+-   [Create Chat Completion](https://docs.perplexity.ai/api-reference/chat-completions) - [Example](https://github.com/SoftCreatR/php-perplexity-ai-sdk/blob/main/examples/chat/createChatCompletion.php)
+  -   `createChatCompletion(array $options = [])`
 
 ## Changelog
 
@@ -93,9 +119,8 @@ For a detailed list of changes and updates, please refer to the [CHANGELOG.md](h
 ## Known Problems and limitations
 
 ### Streaming Support
-Currently, streaming is not supported. It's planned to address this limitation asap. For now, please be aware that these methods cannot be used for streaming purposes.
 
-If you require streaming functionality, consider using an alternative implementation or keep an eye out for future updates to this library.
+Streaming is now supported for real-time token generation in chat completions. Please make sure you are handling streams correctly using a callback, as demonstrated in the examples.
 
 ## License
 

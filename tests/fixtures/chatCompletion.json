@@ -1,0 +1,25 @@
+{
+  "id": "3c90c3cc-0d44-4b50-8888-8dd25736052a",
+  "model": "llama-3.1-sonar-small-128k-online",
+  "object": "chat.completion",
+  "created": 1724369245,
+  "choices": [
+    {
+      "index": 0,
+      "finish_reason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "The number of stars in the Milky Way galaxy is estimated to be between 100 billion and 400 billion stars. The most recent estimates from the Gaia mission suggest that there are approximately 100 to 400 billion stars in the Milky Way, with significant uncertainties remaining due to the difficulty in detecting faint red dwarfs and brown dwarfs."
+      },
+      "delta": {
+        "role": "assistant",
+        "content": ""
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 14,
+    "completion_tokens": 70,
+    "total_tokens": 84
+  }
+}

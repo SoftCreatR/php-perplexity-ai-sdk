@@ -1,7 +1,7 @@
 <?php
 
 /*
- * Copyright (c) 2023, Sascha Greuel and Contributors
+ * Copyright (c) 2023-present, Sascha Greuel and Contributors
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -18,7 +18,7 @@
 
 namespace SoftCreatR\PerplexityAI;
 
-use Exception;
+use InvalidArgumentException;
 use JsonException;
 use Psr\Http\Client\ClientExceptionInterface;
 use Psr\Http\Client\ClientInterface;
@@ -36,59 +36,31 @@ use const JSON_THROW_ON_ERROR;
 /**
  * A wrapper for the PerplexityAI API.
  *
- * @property string $apiKey
- * @property string $origin
- *
- * @method ResponseInterface createChatCompletion(array $options = [])
+ * @method ResponseInterface|null createChatCompletion(array $options, ?\callable $streamCallback = null) Creates a model response for the given chat conversation.
  */
 class PerplexityAI
 {
     /**
-     * The HTTP client instance used for sending requests.
+     * Constructs a new instance of the PerplexityAI client.
+     *
+     * @param RequestFactoryInterface $requestFactory The PSR-17 request factory.
+     * @param StreamFactoryInterface  $streamFactory  The PSR-17 stream factory.
+     * @param UriFactoryInterface     $uriFactory     The PSR-17 URI factory.
+     * @param ClientInterface         $httpClient     The PSR-18 HTTP client.
+     * @param string                  $apiKey         Your PerplexityAI API key.
+     * @param string                  $origin         Custom API origin (hostname).
+     * @param string                  $basePath       Custom base path.
      */
-    private ClientInterface $httpClient;
-
-    /**
-     * The PSR-17 request factory instance used for creating requests.
-     */
-    private RequestFactoryInterface $requestFactory;
-
-    /**
-     * The PSR-17 stream factory instance used for creating request bodies.
-     */
-    private StreamFactoryInterface $streamFactory;
-
-    /**
-     * The PSR-17 URI factory instance used for creating URIs.
-     */
-    private UriFactoryInterface $uriFactory;
-
-    /**
-     * PerplexityAI API Key
-     */
-    public string $apiKey = '';
-
-    /**
-     * PerplexityAI API Origin (defaults to api.perplexity.ai)
-     */
-    public string $origin = '';
-
     public function __construct(
-        RequestFactoryInterface $requestFactory,
-        StreamFactoryInterface $streamFactory,
-        UriFactoryInterface $uriFactory,
-        ClientInterface $httpClient,
+        private readonly RequestFactoryInterface $requestFactory,
+        private readonly StreamFactoryInterface $streamFactory,
+        private readonly UriFactoryInterface $uriFactory,
+        private readonly ClientInterface $httpClient,
         #[SensitiveParameter]
-        string $apiKey,
-        string $origin = ''
-    ) {
-        $this->requestFactory = $requestFactory;
-        $this->streamFactory = $streamFactory;
-        $this->uriFactory = $uriFactory;
-        $this->httpClient = $httpClient;
-        $this->apiKey = $apiKey;
-        $this->origin = $origin;
-    }
+        private readonly string $apiKey,
+        private readonly string $origin = '',
+        private readonly string $basePath = ''
+    ) {}
 
     /**
      * Magic method to call the PerplexityAI API endpoints.
@@ -96,18 +68,19 @@ class PerplexityAI
      * @param string $key The endpoint method.
      * @param array $args The arguments for the endpoint method.
      *
-     * @return ResponseInterface The API response.
+     * @return ResponseInterface|null The API response or null if streaming.
      *
-     * @throws PerplexityAIException If the API returns an error (HTTP status code >= 400).
+     * @throws PerplexityAIException       If the API returns an error.
+     * @throws InvalidArgumentException If the parameters are invalid.
      */
-    public function __call(string $key, array $args): ResponseInterface
+    public function __call(string $key, array $args): ?ResponseInterface
     {
         $endpoint = PerplexityAIURLBuilder::getEndpoint($key);
         $httpMethod = $endpoint['method'];
 
-        [$parameter, $opts] = $this->extractCallArguments($args);
+        [$parameters, $opts, $streamCallback] = $this->extractCallArguments($args);
 
-        return $this->callAPI($httpMethod, $key, $parameter, $opts);
+        return $this->callAPI($httpMethod, $key, $parameters, $opts, $streamCallback);
     }
 
     /**
@@ -115,88 +88,178 @@ class PerplexityAI
      *
      * @param array $args The input arguments.
      *
-     * @return array An array containing the extracted parameter and options.
+     * @return array An array containing the extracted parameters, options, and stream callback.
+     *
+     * @throws InvalidArgumentException If the first argument is not an array.
      */
     private function extractCallArguments(array $args): array
     {
-        $parameter = null;
+        $parameters = [];
         $opts = [];
+        $streamCallback = null;
 
         if (!isset($args[0])) {
-            return [$parameter, $opts];
+            return [$parameters, $opts, $streamCallback];
         }
 
-        if (\is_string($args[0])) {
-            $parameter = $args[0];
+        if (\is_array($args[0])) {
+            $parameters = $args[0];
 
             if (isset($args[1]) && \is_array($args[1])) {
                 $opts = $args[1];
+
+                if (isset($args[2]) && \is_callable($args[2])) {
+                    $streamCallback = $args[2];
+                }
+            } elseif (isset($args[1]) && \is_callable($args[1])) {
+                $streamCallback = $args[1];
             }
-        } elseif (\is_array($args[0])) {
-            $opts = $args[0];
+        } else {
+            throw new InvalidArgumentException('First argument must be an array of parameters.');
         }
 
-        return [$parameter, $opts];
+        return [$parameters, $opts, $streamCallback];
     }
 
     /**
-     * Calls the PerplexityAI API with the provided method, key, parameter, and options.
+     * Calls the PerplexityAI API with the provided method, key, parameters, and options.
      *
      * @param string $method The HTTP method for the request.
      * @param string $key The API endpoint key.
-     * @param string|null $parameter An optional parameter for the request.
-     * @param array $opts The options for the request.
+     * @param array $parameters Parameters for URL placeholders.
+     * @param array $opts The options for the request body or query.
+     * @param callable|null $streamCallback Callback function to handle streaming data.
      *
-     * @return ResponseInterface The API response.
+     * @return ResponseInterface|null The API response or null if streaming.
      *
-     * @throws PerplexityAIException If the API returns an error (HTTP status code >= 400).
+     * @throws PerplexityAIException If the API returns an error.
      */
-    private function callAPI(string $method, string $key, ?string $parameter = null, array $opts = []): ResponseInterface
-    {
-        return $this->sendRequest(
-            PerplexityAIURLBuilder::createUrl($this->uriFactory, $key, $parameter, $this->origin),
-            $method,
-            $opts
+    private function callAPI(
+        string $method,
+        string $key,
+        array $parameters = [],
+        array $opts = [],
+        ?callable $streamCallback = null
+    ): ?ResponseInterface {
+        $uri = PerplexityAIURLBuilder::createUrl(
+            $this->uriFactory,
+            $key,
+            $parameters,
+            $this->origin,
+            $this->basePath
         );
+
+        // Extract headers from opts
+        $customHeaders = $opts['customHeaders'] ?? [];
+        unset($opts['customHeaders']); // Remove headers from opts to avoid sending them in the body
+
+        return $this->sendRequest($uri, $method, $opts, $streamCallback, $customHeaders);
     }
 
     /**
      * Sends an HTTP request to the PerplexityAI API and returns the response.
      *
-     * @param UriInterface $uri The URL to send the request to.
-     * @param string $method The HTTP method to use (e.g., 'GET', 'POST', etc.).
-     * @param array $params An associative array of parameters to send with the request (optional).
+     * @param UriInterface $uri The URI to send the request to.
+     * @param string $method The HTTP method to use.
+     * @param array $params Parameters to include in the request body.
+     * @param callable|null $streamCallback Callback function to handle streaming data.
      *
-     * @return ResponseInterface The response from the PerplexityAI API.
+     * @return ResponseInterface|null The response from the PerplexityAI API or null if streaming.
      *
-     * @throws PerplexityAIException If the API returns an error (HTTP status code >= 400).
-     * @throws Exception
+     * @throws PerplexityAIException If the API returns an error.
      */
-    private function sendRequest(UriInterface $uri, string $method, array $params = []): ResponseInterface
-    {
+    private function sendRequest(
+        UriInterface $uri,
+        string $method,
+        array $params = [],
+        ?callable $streamCallback = null,
+        array $customHeaders = []
+    ): ?ResponseInterface {
         $request = $this->requestFactory->createRequest($method, $uri);
-
-        $headers = $this->createHeaders();
+        $headers = $this->createHeaders($customHeaders);
         $request = $this->applyHeaders($request, $headers);
 
         $body = $this->createJsonBody($params);
 
-        if (!empty($body)) {
+        if ($body !== '') {
             $request = $request->withBody($this->streamFactory->createStream($body));
         }
 
         try {
+            if ($streamCallback !== null && ($params['stream'] ?? false) === true) {
+                $this->handleStreamingResponse($request, $streamCallback);
+
+                return null;
+            }
+
             $response = $this->httpClient->sendRequest($request);
 
-            // Check if the response has a non-200 status code (error)
             if ($response->getStatusCode() >= 400) {
                 throw new PerplexityAIException($response->getBody()->getContents(), $response->getStatusCode());
             }
-        } catch (ClientExceptionInterface $e) {
-            throw new PerplexityAIException($e->getMessage(), $e->getCode(), $e->getPrevious());
-        }
 
-        return $response;
+            return $response;
+        } catch (ClientExceptionInterface $e) {
+            throw new PerplexityAIException($e->getMessage(), $e->getCode(), $e);
+        }
+    }
+
+    /**
+     * Handles a streaming response from the API.
+     *
+     * @param RequestInterface $request        The request to send.
+     * @param callable         $streamCallback The callback function to handle streaming data.
+     *
+     * @return void
+     *
+     * @throws PerplexityAIException If an error occurs during streaming.
+     */
+    private function handleStreamingResponse(RequestInterface $request, callable $streamCallback): void
+    {
+        try {
+            $response = $this->httpClient->sendRequest($request);
+            $statusCode = $response->getStatusCode();
+
+            if ($statusCode >= 400) {
+                throw new PerplexityAIException($response->getBody()->getContents(), $statusCode);
+            }
+
+            $body = $response->getBody();
+            $buffer = '';
+
+            while (!$body->eof()) {
+                $chunk = $body->read(8192);
+                $buffer .= $chunk;
+
+                while (($newlinePos = \strpos($buffer, "\n")) !== false) {
+                    $line = \substr($buffer, 0, $newlinePos);
+                    $buffer = \substr($buffer, $newlinePos + 1);
+
+                    $data = \trim($line);
+
+                    if ($data === '') {
+                        continue;
+                    }
+
+                    if ($data === 'data: [DONE]') {
+                        return;
+                    }
+
+                    if (\str_starts_with($data, 'data: ')) {
+                        $json = \substr($data, 6);
+
+                        try {
+                            $decoded = \json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+                            $streamCallback($decoded);
+                        } catch (JsonException $e) {
+                            throw new PerplexityAIException('JSON decode error: ' . $e->getMessage(), 0, $e);
+                        }
+                    }
+                }
+            }
+        } catch (ClientExceptionInterface $e) {
+            throw new PerplexityAIException($e->getMessage(), $e->getCode(), $e);
+        }
     }
 
     /**
@@ -204,19 +267,22 @@ class PerplexityAI
      *
      * @return array An associative array of headers.
      */
-    private function createHeaders(): array
+    private function createHeaders(array $customHeaders = []): array
     {
-        return [
-            'authorization' => 'Bearer ' . $this->apiKey,
-            'content-type' => 'application/json',
+        $defaultHeaders = [
+            'Authorization' => 'Bearer ' . $this->apiKey,
+            'Content-Type' => 'application/json',
         ];
+
+        // Merge custom headers, overriding defaults if necessary
+        return \array_merge($defaultHeaders, $customHeaders);
     }
 
     /**
      * Applies the headers to the given request.
      *
      * @param RequestInterface $request The request to apply headers to.
-     * @param array $headers An associative array of headers to apply.
+     * @param array            $headers An associative array of headers to apply.
      *
      * @return RequestInterface The request with headers applied.
      */
@@ -230,19 +296,24 @@ class PerplexityAI
     }
 
     /**
-     * Creates a JSON encoded body string from the given parameters.
+     * Creates a JSON-encoded body string from the given parameters.
      *
      * @param array $params An associative array of parameters to encode as JSON.
      *
-     * @return string The JSON encoded body string, or an empty string if encoding fails.
+     * @return string The JSON-encoded body string.
+     *
+     * @throws PerplexityAIException If JSON encoding fails.
      */
     private function createJsonBody(array $params): string
     {
-        try {
-            return !empty($params) ? \json_encode($params, JSON_THROW_ON_ERROR) : '';
-        } catch (JsonException $e) {
-            // Fallback to an empty string if encoding fails
+        if (empty($params)) {
             return '';
+        }
+
+        try {
+            return \json_encode($params, JSON_THROW_ON_ERROR);
+        } catch (JsonException $e) {
+            throw new PerplexityAIException('JSON encode error: ' . $e->getMessage(), 0, $e);
         }
     }
 }

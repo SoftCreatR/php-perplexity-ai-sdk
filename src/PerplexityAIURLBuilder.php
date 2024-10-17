@@ -1,7 +1,7 @@
 <?php
 
 /*
- * Copyright (c) 2023, Sascha Greuel and Contributors
+ * Copyright (c) 2023-present, Sascha Greuel and Contributors
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -23,35 +23,47 @@ use Psr\Http\Message\UriFactoryInterface;
 use Psr\Http\Message\UriInterface;
 
 /**
- * Creates URLs for PerplexityAI API endpoints.
+ * Utility class for creating URLs for PerplexityAI API endpoints.
  */
-final class PerplexityAIURLBuilder
+class PerplexityAIURLBuilder
 {
     public const ORIGIN = 'api.perplexity.ai';
+
+    public const BASE_PATH = '';
 
     private const HTTP_METHOD_POST = 'POST';
 
     /**
-     * @var array<string, array<string, string>> PerplexityAI API endpoints configuration.
+     * Configuration of PerplexityAI API endpoints.
+     *
+     * @var array<string, array{method: string, path: string}>
      */
     private static array $urlEndpoints = [
-        // Chat Completions: https://docs.perplexity.ai/reference/post_chat_completions
+        // Chat Completion
         'createChatCompletion' => ['method' => self::HTTP_METHOD_POST, 'path' => '/chat/completions'],
     ];
+
+    /**
+     * Prevents instantiation of this class.
+     */
+    protected function __construct()
+    {
+        // This class should not be instantiated.
+    }
 
     /**
      * Gets the PerplexityAI API endpoint configuration.
      *
      * @param string $key The endpoint key.
      *
-     * @return array<string, string> The endpoint configuration.
+     * @return array{method: string, path: string} The endpoint configuration.
      *
      * @throws InvalidArgumentException If the provided key is invalid.
      */
     public static function getEndpoint(string $key): array
     {
         if (!isset(self::$urlEndpoints[$key])) {
-            throw new InvalidArgumentException('Invalid Perplexity AI URL key "' . $key . '".');
+            throw new InvalidArgumentException(\sprintf('Invalid PerplexityAI URL key "%s".', $key));
         }
 
         return self::$urlEndpoints[$key];
@@ -60,45 +72,63 @@ final class PerplexityAIURLBuilder
     /**
      * Creates a URL for the specified PerplexityAI API endpoint.
      *
-     * @param UriFactoryInterface $uriFactory The PSR-17 URI factory instance used for creating URIs.
-     * @param string $key The key representing the API endpoint.
-     * @param string|null $parameter Optional parameter to replace in the endpoint path.
-     * @param string $origin Custom origin (Hostname), if needed.
+     * @param UriFactoryInterface  $uriFactory The PSR-17 URI factory instance used for creating URIs.
+     * @param string               $key        The key representing the API endpoint.
+     * @param array<string, mixed> $parameters Optional parameters to replace in the endpoint path.
+     * @param string               $origin     Custom origin (hostname), if needed.
+     * @param string               $basePath   Custom base path, if needed.
      *
      * @return UriInterface The fully constructed URL for the API endpoint.
      *
-     * @throws InvalidArgumentException If the provided key is invalid.
+     * @throws InvalidArgumentException If a required path parameter is missing or invalid.
      */
     public static function createUrl(
         UriFactoryInterface $uriFactory,
         string $key,
-        ?string $parameter = null,
-        string $origin = ''
+        array $parameters = [],
+        string $origin = '',
+        string $basePath = ''
     ): UriInterface {
         $endpoint = self::getEndpoint($key);
-        $path = self::replacePathParameters($endpoint['path'], $parameter);
+        $path = self::replacePathParameters($endpoint['path'], $parameters);
 
         return $uriFactory
             ->createUri()
             ->withScheme('https')
-            ->withHost($origin ?: self::ORIGIN)
-            ->withPath($path);
+            ->withHost($origin !== '' ? $origin : self::ORIGIN)
+            ->withPath(\trim($basePath !== '' ? $basePath : self::BASE_PATH, '/') . $path);
     }
 
     /**
-     * Replaces path parameters in the given path with provided parameter value.
+     * Replaces path parameters in the given path with provided parameter values.
      *
-     * @param string $path The path containing the parameter placeholder.
-     * @param string|null $parameter The parameter value to replace the placeholder with.
+     * @param string              $path       The path containing parameter placeholders.
+     * @param array<string, mixed> $parameters The parameter values to replace placeholders in the path.
      *
-     * @return string The path with replaced parameter value.
+     * @return string The path with replaced parameter values.
+     *
+     * @throws InvalidArgumentException If a required path parameter is missing or invalid.
      */
-    private static function replacePathParameters(string $path, ?string $parameter = null): string
+    private static function replacePathParameters(string $path, array $parameters): string
     {
-        if ($parameter !== null) {
-            return \sprintf($path, $parameter);
-        }
+        return \preg_replace_callback('/\{(\w+)}/', static function ($matches) use ($parameters) {
+            $key = $matches[1];
 
-        return $path;
+            if (!\array_key_exists($key, $parameters)) {
+                throw new InvalidArgumentException(\sprintf('Missing path parameter "%s".', $key));
+            }
+
+            $value = $parameters[$key];
+
+            if (!\is_scalar($value)) {
+                throw new InvalidArgumentException(\sprintf(
+                    'Parameter "%s" must be a scalar value, %s given.',
+                    $key,
+                    \gettype($value)
+                ));
+            }
+
+            return (string)$value;
+        }, $path);
     }
 }
