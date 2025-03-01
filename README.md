@@ -54,16 +54,17 @@ $pplx = new PerplexityAI($requestFactory, $streamFactory, $uriFactory, $httpClie
 Now you can call any supported PerplexityAI API endpoint using the magic method `__call`:
 
 ```php
-$response = $pplx->createChatCompletion([
-    'model' => 'llama-3.1-sonar-small-128k-online',
-    'messages' => [
-        [
-            'role' => 'system',
-            'content' => 'Be precise and concise.'
-        ],
-        [
-            'role' => 'user',
-            'content' => 'How many stars are there in our galaxy?'
+$response = $pplx->createChatCompletion([], 
+    [
+        'model' => 'sonar',
+        'messages' => [
+            [
+                'role' => 'system',
+                'content' => 'Be precise and concise.'
+            ],
+            [
+                'role' => 'user',
+            '   content' => 'How many stars are there in our galaxy?'
         ]
     ],
 ]);
@@ -89,9 +90,9 @@ $streamCallback = static function ($data) {
     }
 };
 
-$pplx->createChatCompletion(
+$pplx->createChatCompletion([],
     [
-        'model' => 'llama-3.1-sonar-small-128k-online',
+        'model' => 'sonar',
         'messages' => [
             [
                 'role' => 'user',
