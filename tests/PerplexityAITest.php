@@ -22,408 +22,391 @@ use Exception;
 use GuzzleHttp\Psr7\HttpFactory;
 use GuzzleHttp\Psr7\Response;
 use InvalidArgumentException;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Client\ClientExceptionInterface;
 use Psr\Http\Client\ClientInterface;
+use Psr\Http\Message\RequestInterface;
 use ReflectionException;
+use ReflectionProperty;
 use SoftCreatR\PerplexityAI\Exception\PerplexityAIException;
+use SoftCreatR\PerplexityAI\Http\StreamingClientInterface;
 use SoftCreatR\PerplexityAI\PerplexityAI;
+use Throwable;
 
 /**
  * @covers \SoftCreatR\PerplexityAI\Exception\PerplexityAIException
+ * @covers \SoftCreatR\PerplexityAI\Http\ServerSentEventDecoder
  * @covers \SoftCreatR\PerplexityAI\PerplexityAI
  * @covers \SoftCreatR\PerplexityAI\PerplexityAIURLBuilder
  */
 final class PerplexityAITest extends TestCase
 {
-    /**
-     * The PerplexityAI instance used for testing.
-     */
     private PerplexityAI $perplexityAI;
 
-    /**
-     * The mocked HTTP client used for simulating API responses.
-     */
-    private ClientInterface $mockedClient;
+    private ClientInterface&Stub $httpClient;
 
-    /**
-     * API key for the PerplexityAI API.
-     */
-    private string $apiKey = 'pplx-...';
-
-    /**
-     * Custom origin for the PerplexityAI API, if needed.
-     */
-    private string $origin = 'example.com';
-
-    /**
-     * Sets up the test environment by creating an PerplexityAI instance and
-     * a mocked HTTP client, then assigns the mocked client to the PerplexityAI instance.
-     *
-     * @throws \PHPUnit\Framework\MockObject\Exception
-     */
+    /** @throws \PHPUnit\Framework\MockObject\Exception */
     protected function setUp(): void
     {
-        parent::setUp();
-
-        $psr17Factory = new HttpFactory();
-        $this->mockedClient = $this->createMock(ClientInterface::class);
-
+        $factory = new HttpFactory();
+        $this->httpClient = $this->createStub(ClientInterface::class);
         $this->perplexityAI = new PerplexityAI(
-            $psr17Factory,
-            $psr17Factory,
-            $psr17Factory,
-            $this->mockedClient,
-            $this->apiKey,
-            $this->origin
+            $factory,
+            $factory,
+            $factory,
+            $this->httpClient,
+            'pplx-test',
+            'example.com',
+            '/api',
         );
     }
 
-    /**
-     * Tests that an InvalidArgumentException is thrown when the first argument is not an array.
-     */
-    public function testInvalidFirstArgumentInCall(): void
+    /** @throws Throwable */
+    public function testBodyFirstCallCreatesJsonRequestAndReturnsResponse(): void
     {
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('First argument must be an array of parameters.');
+        $this->mockRequest(function (RequestInterface $request): Response {
+            $this->assertSame('POST', $request->getMethod());
+            $this->assertSame('https://example.com/api/sonar', (string) $request->getUri());
+            $this->assertSame('Bearer pplx-test', $request->getHeaderLine('Authorization'));
+            $this->assertSame('application/json', $request->getHeaderLine('Content-Type'));
+            $this->assertSame('{"model":"sonar","messages":[]}', (string) $request->getBody());
 
-        /** @noinspection PhpParamsInspection */
-        $this->perplexityAI->createChatCompletion('invalid_argument');
-    }
-
-    /**
-     * Tests that an PerplexityAIException is thrown when the API returns an error response.
-     */
-    public function testCallAPIHandlesErrorResponse(): void
-    {
-        $this->sendRequestMock(static function () {
-            return new Response(400, [], 'Bad Request');
+            return new Response(200, [], '{"ok":true}');
         });
 
-        $this->expectException(PerplexityAIException::class);
-        $this->expectExceptionMessage('Bad Request');
+        $response = $this->perplexityAI->createChatCompletion(['model' => 'sonar', 'messages' => []]);
 
-        // Pass options as the second argument
-        $this->perplexityAI->createChatCompletion([], [
-            'model' => 'llama-3.1-sonar-small-128k-online',
-            'messages' => [
-                [
-                    'role' => 'user',
-                    'content' => 'Test message',
-                ],
-            ],
+        $this->assertSame('{"ok":true}', (string) $response->getBody());
+    }
+
+    /** @throws Throwable */
+    public function testLegacyTwoArrayCallKeepsParametersSeparateFromBody(): void
+    {
+        $this->mockRequest(function (RequestInterface $request): Response {
+            $this->assertSame('https://example.com/api/agent?id=unused&include=usage', (string) $request->getUri());
+            $this->assertSame('{"extra":"value"}', (string) $request->getBody());
+
+            return new Response();
+        });
+
+        $response = $this->perplexityAI->__call('createAgentResponse', [
+            ['id' => 'unused', 'include' => 'usage'],
+            ['extra' => 'value'],
         ]);
+
+        $this->assertSame(200, $response->getStatusCode());
     }
 
-    /**
-     * Tests that an PerplexityAIException is thrown when the HTTP client throws a ClientExceptionInterface.
-     */
-    public function testCallAPICatchesClientException(): void
+    /** @throws Throwable */
+    public function testPathAndQueryParametersAreSeparatedForBodylessCalls(): void
     {
-        $this->sendRequestMock(
-            static fn() => throw new class ('Client error', 0) extends Exception implements ClientExceptionInterface {}
+        $this->mockRequest(function (RequestInterface $request): Response {
+            $this->assertSame('GET', $request->getMethod());
+            $this->assertSame(
+                'https://example.com/api/agent/resp_1/files?limit=10&tags%5B0%5D=a%20b',
+                (string) $request->getUri(),
+            );
+            $this->assertSame('', $request->getHeaderLine('Content-Type'));
+            $this->assertSame('', (string) $request->getBody());
+
+            return new Response();
+        });
+
+        $this->perplexityAI->__call(
+            'listAgentResponseFiles',
+            [['id' => 'resp_1', 'limit' => 10], ['tags' => ['a b']]],
+        );
+    }
+
+    /** @throws Throwable */
+    public function testBodyAndPathCanShareTheFirstArray(): void
+    {
+        $this->mockRequest(function (RequestInterface $request): Response {
+            $this->assertSame('https://example.com/api/agent/resp%2F1/cancel', (string) $request->getUri());
+            $this->assertSame('', (string) $request->getBody());
+
+            return new Response();
+        });
+
+        $this->perplexityAI->cancelAgentResponse(['id' => 'resp/1']);
+    }
+
+    /** @throws Throwable */
+    public function testRequestMethodSupportsQueryBodyAndCustomHeaders(): void
+    {
+        $this->mockRequest(function (RequestInterface $request): Response {
+            $this->assertSame('https://example.com/api/search?source=web', (string) $request->getUri());
+            $this->assertSame('custom', $request->getHeaderLine('Authorization'));
+            $this->assertSame('yes', $request->getHeaderLine('X-Test'));
+            $this->assertSame('{"query":"PHP"}', (string) $request->getBody());
+
+            return new Response(201);
+        });
+
+        $response = $this->perplexityAI->request(
+            'search',
+            ['source' => 'web'],
+            ['query' => 'PHP'],
+            null,
+            ['Authorization' => 'custom', 'X-Test' => 'yes'],
         );
 
-        $this->expectException(PerplexityAIException::class);
-        $this->expectExceptionMessage('Client error');
+        $this->assertSame(201, $response->getStatusCode());
+    }
 
-        // Pass options as the second argument
-        $this->perplexityAI->createChatCompletion([], [
-            'model' => 'llama-3.1-sonar-small-128k-online',
-            'messages' => [
-                [
-                    'role' => 'user',
-                    'content' => 'Test message',
-                ],
-            ],
+    /** @throws Throwable */
+    public function testCustomHeadersCanBePassedInEitherLegacyArray(): void
+    {
+        $requests = [];
+        $this->mockRequest(static function (RequestInterface $request) use (&$requests): Response {
+            $requests[] = $request;
+
+            return new Response();
+        });
+
+        $this->perplexityAI->createEmbedding([
+            'customHeaders' => ['X-First' => 'first'],
+            'model' => 'pplx-embed-v1-0.6b',
+            'input' => 'test',
         ]);
+        $this->perplexityAI->createEmbedding([], [
+            'customHeaders' => ['X-Second' => 'second'],
+            'model' => 'pplx-embed-v1-0.6b',
+            'input' => 'test',
+        ]);
+
+        $this->assertSame('first', $requests[0]->getHeaderLine('X-First'));
+        $this->assertStringNotContainsString('customHeaders', (string) $requests[0]->getBody());
+        $this->assertSame('second', $requests[1]->getHeaderLine('X-Second'));
     }
 
-    /**
-     * Tests that handleStreamingResponse throws an PerplexityAIException when the response status code is >= 400.
-     */
-    public function testHandleStreamingResponseHandlesErrorResponse(): void
+    /** @throws Throwable */
+    public function testStreamingDecodesEventsAndReturnsResponse(): void
     {
-        $this->sendRequestMock(static function () {
-            return new Response(400, [], 'Bad Request');
-        });
+        $response = new Response(200, ['Content-Type' => 'text/event-stream'], "data: {\"delta\":\"a\"}\n\ndata: [DONE]\n\n");
+        $this->mockRequest(static fn(): Response => $response);
+        $events = [];
 
-        $this->expectException(PerplexityAIException::class);
-        $this->expectExceptionMessage('Bad Request');
-
-        $this->perplexityAI->createChatCompletion(
-            [],
-            [
-                'model' => 'llama-3.1-sonar-small-128k-online',
-                'messages' => [
-                    [
-                        'role' => 'user',
-                        'content' => 'Test message',
-                    ],
-                ],
-                'stream' => true,
-            ],
-            static function () {
-                // Streaming callback
-            }
+        $actual = $this->perplexityAI->createChatCompletion(
+            ['model' => 'sonar', 'messages' => [], 'stream' => true],
+            static function (mixed $event) use (&$events): void {
+                $events[] = $event;
+            },
         );
+
+        $this->assertSame($response, $actual);
+        $this->assertSame([['delta' => 'a']], $events);
     }
 
-    /**
-     * Tests that handleStreamingResponse continues when data is an empty string.
-     */
-    public function testHandleStreamingResponseContinuesOnEmptyData(): void
+    /** @throws Throwable */
+    public function testEventStreamContentTypeTriggersDecoderWithoutStreamFlag(): void
     {
-        $fakeResponseContent = "\n"; // Empty data
-        $stream = \fopen('php://temp', 'rb+');
-        \fwrite($stream, $fakeResponseContent);
-        \rewind($stream);
+        $this->mockRequest(static fn(): Response => new Response(
+            200,
+            ['Content-Type' => 'text/event-stream; charset=utf-8'],
+            "data: {\"event\":true}\n\n",
+        ));
+        $events = [];
 
-        $fakeResponse = new Response(200, [], $stream);
-
-        $this->sendRequestMock(static function () use ($fakeResponse) {
-            return $fakeResponse;
-        });
-
-        $this->perplexityAI->createChatCompletion(
-            [],
-            [
-                'model' => 'llama-3.1-sonar-small-128k-online',
-                'messages' => [
-                    [
-                        'role' => 'user',
-                        'content' => 'Test message',
-                    ],
-                ],
-                'stream' => true,
-            ],
-            fn() => $this->fail('Streaming callback should not be called on empty data.')
+        $this->perplexityAI->createAgentResponse(
+            ['model' => 'openai/gpt-5-mini', 'input' => 'test'],
+            static function (mixed $event) use (&$events): void {
+                $events[] = $event;
+            },
         );
 
-        $this->assertTrue(true); // If no exception is thrown, test passes
+        $this->assertSame([['event' => true]], $events);
     }
 
-    /**
-     * Tests that handleStreamingResponse throws an PerplexityAIException when JSON decoding fails.
-     */
-    public function testHandleStreamingResponseJsonException(): void
+    /** @throws Throwable */
+    public function testNormalResponseDoesNotInvokeCallback(): void
     {
-        $fakeResponseContent = "data: invalid_json\n";
-        $stream = \fopen('php://temp', 'rb+');
-        \fwrite($stream, $fakeResponseContent);
-        \rewind($stream);
+        $this->mockRequest(static fn(): Response => new Response(200, ['Content-Type' => 'application/json'], '{}'));
 
-        $fakeResponse = new Response(200, [], $stream);
-
-        $this->sendRequestMock(static function () use ($fakeResponse) {
-            return $fakeResponse;
-        });
-
-        $this->expectException(PerplexityAIException::class);
-        $this->expectExceptionMessageMatches('/JSON decode error:/');
-
-        $this->perplexityAI->createChatCompletion(
-            [],
-            [
-                'model' => 'llama-3.1-sonar-small-128k-online',
-                'messages' => [
-                    [
-                        'role' => 'user',
-                        'content' => 'Test message',
-                    ],
-                ],
-                'stream' => true,
-            ],
-            static function ($data) {
-                // Streaming callback
-            }
+        $this->perplexityAI->createAgentResponse(
+            ['input' => 'test'],
+            fn() => $this->fail('Callback must only receive SSE responses.'),
         );
+
+        $this->addToAssertionCount(1);
     }
 
-    /**
-     * Tests that handleStreamingResponse catches ClientExceptionInterface exceptions.
-     */
-    public function testHandleStreamingResponseCatchesClientException(): void
+    /** @throws Throwable */
+    public function testStreamingClientExtensionIsUsedForStreamingRequests(): void
     {
-        $this->sendRequestMock(
-            static fn() => throw new class ('Client error in streaming', 0) extends Exception implements ClientExceptionInterface {}
-        );
+        $factory = new HttpFactory();
+        $client = $this->createMock(StreamingClientInterface::class);
+        $client->expects($this->never())->method('sendRequest');
+        $client->expects($this->once())->method('sendStreamingRequest')->willReturn(new Response(
+            200,
+            ['Content-Type' => 'text/event-stream'],
+            "data: [DONE]\n\n",
+        ));
+        $sdk = new PerplexityAI($factory, $factory, $factory, $client, 'key');
 
-        $this->expectException(PerplexityAIException::class);
-        $this->expectExceptionMessage('Client error in streaming');
-
-        $this->perplexityAI->createChatCompletion(
-            [],
-            [
-                'model' => 'llama-3.1-sonar-small-128k-online',
-                'messages' => [
-                    [
-                        'role' => 'user',
-                        'content' => 'Test message',
-                    ],
-                ],
-                'stream' => true,
-            ],
-            static function () {
-                // Streaming callback
-            }
+        $sdk->createRouterResponse(
+            ['model' => 'openai/gpt-5-mini', 'input' => 'test', 'stream' => true],
+            static function (): void {},
         );
     }
 
     /**
-     * Tests that createJsonBody throws an PerplexityAIException when JSON encoding fails.
-     *
      * @throws ReflectionException
+     * @throws Throwable
+     * @throws \PHPUnit\Framework\MockObject\Exception
      */
-    public function testCreateJsonBodyJsonException(): void
+    public function testEndpointMetadataControlsQueryHeadersAndStreaming(): void
     {
-        $reflectionMethod = TestHelper::getPrivateMethod($this->perplexityAI, 'createJsonBody');
+        $property = new ReflectionProperty(\SoftCreatR\PerplexityAI\PerplexityAIURLBuilder::class, 'urlEndpoints');
+        $endpoints = $property->getValue();
+        $property->setValue(null, $endpoints + [
+            'metadataTest' => [
+                'method' => 'POST',
+                'path' => '/metadata',
+                'category' => 'test',
+                'body' => 'json',
+                'query' => ['default' => 'value'],
+                'headers' => ['X-Endpoint' => 'enabled'],
+                'streaming' => true,
+            ],
+        ]);
+
+        try {
+            $factory = new HttpFactory();
+            $client = $this->createMock(StreamingClientInterface::class);
+            $client->expects($this->never())->method('sendRequest');
+            $client->expects($this->once())->method('sendStreamingRequest')->willReturnCallback(
+                function (RequestInterface $request): Response {
+                    $this->assertSame('https://example.com/api/metadata?default=override&extra=yes', (string) $request->getUri());
+                    $this->assertSame('enabled', $request->getHeaderLine('X-Endpoint'));
+
+                    return new Response(200, ['Content-Type' => 'text/event-stream'], "data: [DONE]\n\n");
+                },
+            );
+            $sdk = new PerplexityAI($factory, $factory, $factory, $client, 'key', 'example.com', '/api');
+
+            $sdk->request('metadataTest', ['default' => 'override', 'extra' => 'yes'], ['input' => 'test']);
+        } finally {
+            $property->setValue(null, $endpoints);
+        }
+    }
+
+    /** @throws Throwable */
+    public function testClientExceptionsAreWrapped(): void
+    {
+        $previous = new class ('Transport failed', 17) extends Exception implements ClientExceptionInterface {};
+        $this->mockRequest(static fn() => throw $previous);
+
+        try {
+            $this->perplexityAI->listModels();
+            $this->fail('Expected transport exception.');
+        } catch (PerplexityAIException $exception) {
+            $this->assertSame('Transport failed', $exception->getMessage());
+            $this->assertSame(17, $exception->getCode());
+            $this->assertSame($previous, $exception->getPrevious());
+        }
+    }
+
+    /** @throws Throwable */
+    public function testApiErrorsContainStructuredResponseDetails(): void
+    {
+        $this->mockRequest(static fn(): Response => new Response(
+            429,
+            ['x-request-id' => 'req_123', 'retry-after' => '10'],
+            '{"error":{"message":"Rate limited","type":"rate_limit"}}',
+        ));
+
+        try {
+            $this->perplexityAI->listModels();
+            $this->fail('Expected API exception.');
+        } catch (PerplexityAIException $exception) {
+            $this->assertSame('Rate limited', $exception->getMessage());
+            $this->assertSame(429, $exception->getCode());
+            $this->assertSame('req_123', $exception->getRequestId());
+            $this->assertSame('10', $exception->getResponseHeaders()['retry-after'][0]);
+            $this->assertSame('rate_limit', $exception->getError()['type']);
+        }
+    }
+
+    /** @throws ReflectionException */
+    public function testJsonEncodingErrorsAreWrapped(): void
+    {
+        $method = TestHelper::getPrivateMethod($this->perplexityAI, 'createJsonBody');
+        $resource = \tmpfile();
 
         $this->expectException(PerplexityAIException::class);
         $this->expectExceptionMessageMatches('/^JSON encode error:/');
 
-        $invalidValue = \tmpfile(); // Cannot be JSON encoded
-        $params = ['invalid' => $invalidValue];
-
-        $reflectionMethod->invoke($this->perplexityAI, $params);
+        $method->invoke($this->perplexityAI, ['resource' => $resource]);
     }
 
-    /**
-     * Tests that the createChatCompletion method handles API calls correctly.
-     *
-     * @throws Exception
-     */
-    public function testCreateChatCompletion(): void
+    /** @throws ReflectionException */
+    public function testPrivateArgumentNormalizerCompatibilityBranch(): void
     {
-        $this->testApiCall(
-            fn() => $this->perplexityAI->createChatCompletion([], [
-                'model' => 'llama-3.1-sonar-small-128k-online',
-                'messages' => [
-                    [
-                        'role' => 'system',
-                        'content' => 'Be precise and concise.',
-                    ],
-                    [
-                        'role' => 'user',
-                        'content' => 'How many stars are there in our galaxy?',
-                    ],
-                ],
-            ])
-        );
-    }
+        $method = TestHelper::getPrivateMethod($this->perplexityAI, 'extractCallArguments');
+        $callback = static function (): void {};
 
-    /**
-     * Tests that the createChatCompletion method handles streaming API calls correctly.
-     *
-     * @throws Exception
-     */
-    public function testCreateChatCompletionWithStreaming(): void
-    {
-        $output = '';
-
-        $streamCallback = static function ($data) use (&$output) {
-            if (isset($data['choices'][0]['delta']['content'])) {
-                $output .= $data['choices'][0]['delta']['content'];
-            }
-        };
-
-        $this->testApiCallWithStreaming(
-            fn($streamCallback) => $this->perplexityAI->createChatCompletion(
-                [],
-                [
-                    'model' => 'llama-3.1-sonar-small-128k-online',
-                    'messages' => [
-                        [
-                            'role' => 'user',
-                            'content' => 'Tell me a story about a brave knight.',
-                        ],
-                    ],
-                    'stream' => true,
-                ],
-                $streamCallback
+        $this->assertSame(
+            [['a' => 1], ['b' => 2], $callback, ['X-Test' => 'second']],
+            $method->invoke(
+                $this->perplexityAI,
+                [['a' => 1, 'customHeaders' => ['X-Test' => 'first']], ['b' => 2, 'customHeaders' => ['X-Test' => 'second']], $callback],
             ),
-            $streamCallback
         );
+        $this->assertSame(
+            [['id' => 'response/1'], ['input' => 'test'], null, []],
+            $method->invoke(
+                $this->perplexityAI,
+                [['id' => 'response/1', 'input' => 'test']],
+                ['method' => 'POST', 'path' => '/responses/{id}', 'body' => 'json'],
+            ),
+        );
+    }
 
-        $expectedOutput = 'Hello';
-        $this->assertEquals($expectedOutput, $output);
+    /** @throws ReflectionException */
+    public function testPrivateBodyAndHeaderCompatibilityBranches(): void
+    {
+        $inferBodyType = TestHelper::getPrivateMethod($this->perplexityAI, 'inferBodyType');
+        $createHeaders = TestHelper::getPrivateMethod($this->perplexityAI, 'createHeaders');
+
+        $this->assertSame('none', $inferBodyType->invoke($this->perplexityAI, 'GET', '/resource'));
+        $this->assertSame('none', $inferBodyType->invoke($this->perplexityAI, 'DELETE', '/resource'));
+        $this->assertSame('json', $inferBodyType->invoke($this->perplexityAI, 'POST', '/resource'));
+        $this->assertSame('application/json', $createHeaders->invoke($this->perplexityAI, true)['Content-Type']);
+        $this->assertArrayNotHasKey('Content-Type', $createHeaders->invoke($this->perplexityAI, false));
     }
 
     /**
-     * Mocks an API call using a callable and a response file.
+     * @param array<int, mixed> $arguments
      *
-     * Mocks the HTTP client to return a predefined response loaded from a file,
-     * and checks if the status code and response body match the expected values.
-     *
-     * @param callable $apiCall      The API call to test.
-     *
-     * @throws Exception
+     * @throws Throwable
      */
-    private function testApiCall(callable $apiCall): void
+    #[DataProvider('invalidArguments')]
+    public function testRejectsInvalidMagicCallArguments(array $arguments, string $message): void
     {
-        $fakeResponseBody = TestHelper::loadResponseFromFile('chatCompletion.json');
-        $fakeResponse = new Response(200, [], $fakeResponseBody);
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage($message);
 
-        $this->sendRequestMock(static function () use ($fakeResponse) {
-            return $fakeResponse;
-        });
-
-        try {
-            $response = $apiCall();
-        } catch (Exception $e) {
-            $this->fail('Exception occurred during API call: ' . $e->getMessage());
-        }
-
-        self::assertNotNull($response, 'Response should not be null.');
-        self::assertEquals(200, $response->getStatusCode());
-        self::assertEquals($fakeResponseBody, (string)$response->getBody());
+        $this->perplexityAI->__call('createChatCompletion', $arguments);
     }
 
-    /**
-     * Mocks an API call with streaming support using a callable and a response file.
-     *
-     * Mocks the HTTP client to return a predefined streaming response loaded from a file,
-     * and utilizes the provided stream callback to process the response.
-     *
-     * @param callable $apiCall       The API call to test.
-     * @param callable $streamCallback The callback function to handle streaming data.
-     *
-     * @throws Exception
-     */
-    private function testApiCallWithStreaming(callable $apiCall, callable $streamCallback): void
+    /** @return iterable<string, array{array<int,mixed>,string}> */
+    public static function invalidArguments(): iterable
     {
-        $fakeResponseContent = TestHelper::loadResponseFromFile('chatCompletionStreaming.txt');
-        $fakeChunks = \explode("\n", \trim($fakeResponseContent));
-        $stream = \fopen('php://temp', 'rb+');
-
-        foreach ($fakeChunks as $chunk) {
-            \fwrite($stream, $chunk . "\n");
-        }
-        \rewind($stream);
-
-        $fakeResponse = new Response(200, [], $stream);
-
-        $this->sendRequestMock(static function () use ($fakeResponse) {
-            return $fakeResponse;
-        });
-
-        try {
-            $apiCall($streamCallback);
-        } catch (Exception $e) {
-            $this->fail('Exception occurred during streaming: ' . $e->getMessage());
-        }
+        yield 'too many' => [[[], [], static function (): void {}, 'extra'], 'Endpoint calls accept at most three arguments.'];
+        yield 'first type' => [['invalid'], 'First argument must be an array of parameters.'];
+        yield 'second type' => [[[], 'invalid'], 'Second argument must be an array or callable.'];
+        yield 'third without body' => [[[], static function (): void {}, static function (): void {}], 'Third argument must be a stream callback.'];
+        yield 'third type' => [[[], [], 'invalid'], 'Third argument must be a stream callback.'];
+        yield 'headers first' => [[['customHeaders' => 'invalid']], 'customHeaders must be an array.'];
+        yield 'headers second' => [[[], ['customHeaders' => 'invalid']], 'customHeaders must be an array.'];
     }
 
-    /**
-     * Sets up a mock for the sendRequest method of the mocked client.
-     *
-     * @param callable $responseCallback A callable that returns a response or throws an exception.
-     */
-    private function sendRequestMock(callable $responseCallback): void
+    /** @param callable(RequestInterface):Response $callback */
+    private function mockRequest(callable $callback): void
     {
-        $this->mockedClient
-            ->expects(self::once())
-            ->method('sendRequest')
-            ->willReturnCallback($responseCallback);
+        $this->httpClient->method('sendRequest')->willReturnCallback($callback);
     }
 }

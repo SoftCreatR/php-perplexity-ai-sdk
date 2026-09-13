@@ -1,149 +1,265 @@
-# PerplexityAI API Wrapper for PHP
+# Perplexity API SDK for PHP
 
-[![Build](https://img.shields.io/github/actions/workflow/status/SoftCreatR/php-perplexity-ai-sdk/.github/workflows/create-release.yml?branch=main)](https://github.com/SoftCreatR/php-perplexity-ai-sdk/actions/workflows/create-release.yml) [![Latest Release](https://img.shields.io/packagist/v/SoftCreatR/php-perplexity-ai-sdk?color=blue&label=Latest%20Release)](https://packagist.org/packages/softcreatr/php-perplexity-ai-sdk) [![ISC licensed](https://img.shields.io/badge/license-ISC-blue.svg)](./LICENSE.md) [![Plant Tree](https://img.shields.io/badge/dynamic/json?color=brightgreen&label=Plant%20Tree&query=%24.total&url=https%3A%2F%2Fpublic.offset.earth%2Fusers%2Fsoftcreatr%2Ftrees)](https://ecologi.com/softcreatr?r=61212ab3fc69b8eb8a2014f4) [![Codecov branch](https://img.shields.io/codecov/c/github/SoftCreatR/php-perplexity-ai-sdk)](https://codecov.io/gh/SoftCreatR/php-perplexity-ai-sdk) [![Code Climate maintainability](https://img.shields.io/codeclimate/maintainability-percentage/SoftCreatR/php-perplexity-ai-sdk)](https://codeclimate.com/github/SoftCreatR/php-perplexity-ai-sdk)
+[![Tests](https://img.shields.io/github/actions/workflow/status/SoftCreatR/php-perplexity-ai-sdk/.github/workflows/validate-pr.yml?branch=main&label=tests)](https://github.com/SoftCreatR/php-perplexity-ai-sdk/actions/workflows/validate-pr.yml)
+[![Latest Release](https://img.shields.io/packagist/v/softcreatr/php-perplexity-ai-sdk)](https://packagist.org/packages/softcreatr/php-perplexity-ai-sdk)
+[![PHP](https://img.shields.io/packagist/dependency-v/softcreatr/php-perplexity-ai-sdk/php)](composer.json)
+[![License](https://img.shields.io/badge/license-ISC-blue.svg)](LICENSE.md)
 
-This PHP library provides a simple wrapper for the PerplexityAI API, allowing you to easily integrate the PerplexityAI API into your PHP projects.
-
-## Features
-
-- Easy integration with PerplexityAI API
-- Supports all PerplexityAI API endpoints
-- Streaming support for real-time responses in chat completions
-- Utilizes PSR-17 and PSR-18 compliant HTTP clients and factories for making API requests
+A lightweight PSR-17/PSR-18 client for the current [Perplexity API](https://docs.perplexity.ai/api-reference), with
+examples for every exposed SDK method, SSE streaming, structured errors, compatible endpoint overrides, and separate
+organization analytics authentication.
 
 ## Requirements
 
-- PHP 8.1 or higher
-- A PSR-17 HTTP Factory implementation (e.g., [guzzle/psr7](https://github.com/guzzle/psr7) or [nyholm/psr7](https://github.com/Nyholm/psr7))
-- A PSR-18 HTTP Client implementation (e.g., [guzzlehttp/guzzle](https://github.com/guzzle/guzzle) or [symfony/http-client](https://github.com/symfony/http-client))
+- PHP 8.1 or newer. CI tests PHP 8.1, 8.2, 8.3, 8.4, and 8.5.
+- A PSR-17 request, stream, and URI factory.
+- A PSR-18 HTTP client.
+- The JSON extension.
+
+Guzzle is used below because it provides both the PSR-17 factories and PSR-18 client implementation. The SDK itself
+depends only on the PSR interfaces, so other compliant implementations remain supported.
 
 ## Installation
 
-You can install the library via [Composer](https://getcomposer.org/):
-
 ```bash
-composer require softcreatr/php-perplexity-ai-sdk
+composer require softcreatr/php-perplexity-ai-sdk guzzlehttp/guzzle
 ```
 
-## Usage
-
-First, include the library in your project:
+## Client Setup
 
 ```php
 <?php
 
-require_once 'vendor/autoload.php';
-```
+declare(strict_types=1);
 
-Then, create an instance of the `PerplexityAI` class with your API key, an HTTP client, an HTTP request factory, and an HTTP stream factory:
+require __DIR__ . '/vendor/autoload.php';
 
-```php
+use GuzzleHttp\Client;
+use GuzzleHttp\Psr7\HttpFactory;
 use SoftCreatR\PerplexityAI\PerplexityAI;
 
-$apiKey = 'your_api_key';
-
-// Replace these lines with your chosen PSR-17 and PSR-18 compatible HTTP client and factories
-$httpClient = new YourChosenHttpClient();
-$requestFactory = new YourChosenRequestFactory();
-$streamFactory = new YourChosenStreamFactory();
-$uriFactory = new YourChosenUriFactory();
-
-$pplx = new PerplexityAI($requestFactory, $streamFactory, $uriFactory, $httpClient, $apiKey);
-```
-
-Now you can call any supported PerplexityAI API endpoint using the magic method `__call`:
-
-```php
-$response = $pplx->createChatCompletion([], 
-    [
-        'model' => 'sonar',
-        'messages' => [
-            [
-                'role' => 'system',
-                'content' => 'Be precise and concise.'
-            ],
-            [
-                'role' => 'user',
-            '   content' => 'How many stars are there in our galaxy?'
-        ]
-    ],
-]);
-
-// Process the API response
-if ($response->getStatusCode() === 200) {
-    $responseObj = json_decode($response->getBody()->getContents(), true);
-    
-    print_r($responseObj);
-} else {
-    echo "Error: " . $response->getStatusCode();
-}
-```
-
-### Streaming Example
-
-You can enable real-time streaming for chat completions:
-
-```php
-$streamCallback = static function ($data) {
-    if (isset($data['choices'][0]['delta']['content'])) {
-        echo $data['choices'][0]['delta']['content'];
-    }
-};
-
-$pplx->createChatCompletion([],
-    [
-        'model' => 'sonar',
-        'messages' => [
-            [
-                'role' => 'user',
-                'content' => 'Tell me a story about a brave knight.',
-            ],
-        ],
-        'stream' => true,
-    ],
-    $streamCallback
+$factory = new HttpFactory();
+$perplexity = new PerplexityAI(
+    requestFactory: $factory,
+    streamFactory: $factory,
+    uriFactory: $factory,
+    httpClient: new Client(['stream' => true]),
+    apiKey: (string) getenv('PERPLEXITY_API_KEY'),
 );
 ```
 
-For more details on how to use each endpoint, refer to the [PerplexityAI API documentation](https://docs.perplexity.ai/reference), and the [examples](https://github.com/SoftCreatR/php-perplexity-ai-sdk/tree/main/examples) provided in the repository.
+Keep API keys on the server and out of source control.
+
+## Agent API
+
+The Agent API provides model and tool orchestration through a unified response interface.
+
+```php
+use const JSON_THROW_ON_ERROR;
+
+$response = $perplexity->createAgentResponse([
+    'model' => 'openai/gpt-5-mini',
+    'input' => 'Give me a one-sentence summary of PSR-18.',
+]);
+
+$result = json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
+```
+
+Endpoint methods return a PSR-7 `ResponseInterface`, including calls that deliver SSE events to a callback.
+
+## Sonar API
+
+Sonar provides Perplexity's search-grounded chat completions.
+
+```php
+$response = $perplexity->createChatCompletion([
+    'model' => 'sonar',
+    'messages' => [
+        ['role' => 'user', 'content' => 'When did Wolfgang Amadeus Mozart die?'],
+    ],
+]);
+```
+
+## Arguments
+
+Body-only endpoints use a single body array:
+
+```php
+$perplexity->createEmbedding([
+    'model' => 'pplx-embed-v1-0.6b',
+    'input' => 'A sentence to embed.',
+]);
+```
+
+For endpoints with path parameters, a single combined array is the preferred v3 form. Path fields are separated from
+query or body fields using the endpoint template:
+
+```php
+$perplexity->retrieveAgentResponse([
+    'id' => 'resp_abc123',
+]);
+```
+
+The v2 two-array form remains supported for existing integrations:
+
+```php
+$perplexity->createChatCompletion([], [
+    'model' => 'sonar',
+    'messages' => [['role' => 'user', 'content' => 'Summarize PSR-18.']],
+]);
+```
+
+For `GET` and `DELETE` methods, non-path values become RFC 3986 query parameters. Path parameter values are URL
+encoded. The explicit form is available when method names are determined at runtime:
+
+```php
+$response = $perplexity->request(
+    'retrieveAgentResponse',
+    ['id' => 'resp_abc123'],
+    customHeaders: ['X-Trace-Id' => 'trace_abc123'],
+);
+```
+
+## Streaming
+
+Set `stream` to `true` and pass a callback. The decoder supports arbitrarily split chunks, CRLF and LF delimiters,
+comments, multiline data fields, final unterminated frames, and `[DONE]`.
+
+```php
+$perplexity->createChatCompletion(
+    [
+        'model' => 'sonar',
+        'messages' => [['role' => 'user', 'content' => 'Write a short haiku about PHP.']],
+        'stream' => true,
+    ],
+    static function (array $event): void {
+        echo $event['choices'][0]['delta']['content'] ?? '';
+    },
+);
+```
+
+An ordinary JSON response is still returned when a callback is supplied without requesting an SSE stream. For a
+transport that exposes a response before buffering its complete body, implement `StreamingClientInterface`. Other
+PSR-18 clients remain supported and use their normal `sendRequest()` behavior.
+
+## Errors
+
+4xx and 5xx responses throw `PerplexityAIException`. The exception keeps the parsed API error, raw response body,
+response headers, status code, and `x-request-id` for diagnostics.
+
+```php
+use SoftCreatR\PerplexityAI\Exception\PerplexityAIException;
+
+try {
+    $perplexity->listModels();
+} catch (PerplexityAIException $exception) {
+    error_log(sprintf(
+        'Perplexity request %s failed (%d): %s',
+        $exception->getRequestId() ?? 'unknown',
+        $exception->getCode(),
+        $exception->getMessage(),
+    ));
+}
+```
+
+PSR-18 transport failures are wrapped in `PerplexityAIException` and retain the original exception as `getPrevious()`.
+
+## Examples
+
+Examples load the ignored project-level `.env` through `examples/PerplexityAIFactory.php`:
+
+```bash
+cp .env.example .env
+php examples/sonar/createChatCompletion.php
+```
+
+Set `PERPLEXITY_ANALYTICS_API_KEY` only when running examples under `examples/analytics`.
 
 ## Supported Methods
 
-### Chat Completions
--   [Create Chat Completion](https://docs.perplexity.ai/api-reference/chat-completions) - [Example](https://github.com/SoftCreatR/php-perplexity-ai-sdk/blob/main/examples/chat/createChatCompletion.php)
-  -   `createChatCompletion(array $options = [])`
+The catalog follows the current [Perplexity API reference](https://docs.perplexity.ai/api-reference).
 
-## Changelog
+### Agent
 
-For a detailed list of changes and updates, please refer to the [CHANGELOG.md](https://github.com/SoftCreatR/php-perplexity-ai-sdk/blob/main/CHANGELOG.md) file. We adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and document notable changes for each release.
+| SDK method | HTTP route | Request body | Example |
+| --- | --- | --- | --- |
+| `createAgentResponse` | `POST /v1/agent` | `json` | [PHP](examples/agent/createAgentResponse.php) |
+| `retrieveAgentResponse` | `GET /v1/agent/{id}` | `none` | [PHP](examples/agent/retrieveAgentResponse.php) |
+| `listAgentResponseFiles` | `GET /v1/agent/{id}/files` | `none` | [PHP](examples/agent/listAgentResponseFiles.php) |
+| `downloadAgentResponseFile` | `GET /v1/agent/{id}/files/{file_id}/content` | `none` | [PHP](examples/agent/downloadAgentResponseFile.php) |
+| `cancelAgentResponse` | `POST /v1/agent/{id}/cancel` | `none` | [PHP](examples/agent/cancelAgentResponse.php) |
 
-## Known Problems and limitations
+### Sonar
 
-### Streaming Support
+| SDK method | HTTP route | Request body | Example |
+| --- | --- | --- | --- |
+| `createChatCompletion` | `POST /v1/sonar` | `json` | [PHP](examples/sonar/createChatCompletion.php) |
+| `createAsyncChatCompletion` | `POST /v1/async/sonar` | `json` | [PHP](examples/sonar/async/createAsyncChatCompletion.php) |
+| `listAsyncChatCompletions` | `GET /v1/async/sonar` | `none` | [PHP](examples/sonar/async/listAsyncChatCompletions.php) |
+| `retrieveAsyncChatCompletion` | `GET /v1/async/sonar/{api_request}` | `none` | [PHP](examples/sonar/async/retrieveAsyncChatCompletion.php) |
 
-Streaming is now supported for real-time token generation in chat completions. Please make sure you are handling streams correctly using a callback, as demonstrated in the examples.
+### Search
+
+| SDK method | HTTP route | Request body | Example |
+| --- | --- | --- | --- |
+| `search` | `POST /search` | `json` | [PHP](examples/search/search.php) |
+
+### Embeddings
+
+| SDK method | HTTP route | Request body | Example |
+| --- | --- | --- | --- |
+| `createEmbedding` | `POST /v1/embeddings` | `json` | [PHP](examples/embeddings/createEmbedding.php) |
+| `createContextualizedEmbedding` | `POST /v1/contextualizedembeddings` | `json` | [PHP](examples/embeddings/createContextualizedEmbedding.php) |
+
+### Models
+
+| SDK method | HTTP route | Request body | Example |
+| --- | --- | --- | --- |
+| `listModels` | `GET /v1/models` | `none` | [PHP](examples/models/listModels.php) |
+
+### Router
+
+| SDK method | HTTP route | Request body | Example |
+| --- | --- | --- | --- |
+| `createRouterChatCompletion` | `POST /router/v1/chat/completions` | `json` | [PHP](examples/router/chat/createRouterChatCompletion.php) |
+| `createRouterMessage` | `POST /router/v1/messages` | `json` | [PHP](examples/router/messages/createRouterMessage.php) |
+| `createRouterResponse` | `POST /router/v1/responses` | `json` | [PHP](examples/router/responses/createRouterResponse.php) |
+| `listRouterModels` | `GET /router/v1/models` | `none` | [PHP](examples/router/models/listRouterModels.php) |
+| `retrieveRouterModel` | `GET /router/v1/models/{model}` | `none` | [PHP](examples/router/models/retrieveRouterModel.php) |
+
+### Authentication
+
+| SDK method | HTTP route | Request body | Example |
+| --- | --- | --- | --- |
+| `generateAuthToken` | `POST /generate_auth_token` | `json` | [PHP](examples/authentication/generateAuthToken.php) |
+| `revokeAuthToken` | `POST /revoke_auth_token` | `json` | [PHP](examples/authentication/revokeAuthToken.php) |
+
+These operations manage live credentials. Review the examples before running them.
+
+### Analytics
+
+| SDK method | HTTP route | Request body | Example |
+| --- | --- | --- | --- |
+| `getComputerUsageAnalytics` | `GET /v1/analytics/computer/usage` | `none` | [PHP](examples/analytics/getComputerUsageAnalytics.php) |
+| `getComputerUsageAnalyticsV2` | `GET /v2/analytics/computer/usage` | `none` | [PHP](examples/analytics/getComputerUsageAnalyticsV2.php) |
+
+Analytics endpoints require a separate organization analytics API key. The example factory reads it from
+`PERPLEXITY_ANALYTICS_API_KEY`.
+
+## Custom API Origin
+
+Pass a hostname or absolute base URL through the constructor's `origin` argument. `basePath` overrides any path already
+present in an absolute origin. The examples read `PERPLEXITY_API_ORIGIN` and `PERPLEXITY_API_BASE_PATH` from `.env`.
+
+## Development
+
+```bash
+composer install
+composer test
+composer analyse
+vendor/bin/php-cs-fixer fix --dry-run --diff
+```
 
 ## License
 
-This library is licensed under the ISC License. See the [LICENSE](https://github.com/SoftCreatR/php-perplexity-ai-sdk/blob/main/LICENSE.md) file for more information.
-
-## Maintainers 🛠️
-
-<table>
-<tr>
-    <td style="text-align:center;word-wrap:break-word;width:150px;height: 150px">
-        <a href=https://github.com/SoftCreatR>
-            <img src=https://avatars.githubusercontent.com/u/81188?v=4 width="100;" alt="Sascha Greuel"/>
-            <br />
-            <sub style="font-size:14px"><b>Sascha Greuel</b></sub>
-        </a>
-    </td>
-</tr>
-</table>
-
-## Contributors ✨
-
-<table>
-<tr>
-</tr>
-</table>
+Licensed under the [ISC License](LICENSE.md).

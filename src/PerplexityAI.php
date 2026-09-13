@@ -26,31 +26,51 @@ use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamFactoryInterface;
+use Psr\Http\Message\StreamInterface;
 use Psr\Http\Message\UriFactoryInterface;
 use Psr\Http\Message\UriInterface;
 use SensitiveParameter;
 use SoftCreatR\PerplexityAI\Exception\PerplexityAIException;
+use SoftCreatR\PerplexityAI\Http\ServerSentEventDecoder;
+use SoftCreatR\PerplexityAI\Http\StreamingClientInterface;
+use Throwable;
 
 use const JSON_THROW_ON_ERROR;
+use const PHP_QUERY_RFC3986;
 
 /**
- * A wrapper for the PerplexityAI API.
+ * PSR-17/PSR-18 client for the Perplexity API.
  *
- * @method ResponseInterface|null createChatCompletion(array $options, ?\callable $streamCallback = null) Creates a model response for the given chat conversation.
+ * Registered endpoints can be called as magic methods or through request().
+ * See README.md for the complete method catalog.
+ *
+ * API METHODS START
+ * @method ResponseInterface|null createAgentResponse(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null retrieveAgentResponse(array<string, mixed> $parameters = [])
+ * @method ResponseInterface|null listAgentResponseFiles(array<string, mixed> $parameters = [])
+ * @method ResponseInterface|null downloadAgentResponseFile(array<string, mixed> $parameters = [])
+ * @method ResponseInterface|null cancelAgentResponse(array<string, mixed> $parameters = [])
+ * @method ResponseInterface|null createChatCompletion(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null createAsyncChatCompletion(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null listAsyncChatCompletions(array<string, mixed> $parameters = [])
+ * @method ResponseInterface|null retrieveAsyncChatCompletion(array<string, mixed> $parameters = [])
+ * @method ResponseInterface|null search(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null createEmbedding(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null createContextualizedEmbedding(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null listModels(array<string, mixed> $parameters = [])
+ * @method ResponseInterface|null createRouterChatCompletion(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null createRouterMessage(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null createRouterResponse(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null listRouterModels(array<string, mixed> $parameters = [])
+ * @method ResponseInterface|null retrieveRouterModel(array<string, mixed> $parameters = [])
+ * @method ResponseInterface|null generateAuthToken(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null revokeAuthToken(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null getComputerUsageAnalytics(array<string, mixed> $parameters = [])
+ * @method ResponseInterface|null getComputerUsageAnalyticsV2(array<string, mixed> $parameters = [])
+ * API METHODS END
  */
 class PerplexityAI
 {
-    /**
-     * Constructs a new instance of the PerplexityAI client.
-     *
-     * @param RequestFactoryInterface $requestFactory The PSR-17 request factory.
-     * @param StreamFactoryInterface  $streamFactory  The PSR-17 stream factory.
-     * @param UriFactoryInterface     $uriFactory     The PSR-17 URI factory.
-     * @param ClientInterface         $httpClient     The PSR-18 HTTP client.
-     * @param string                  $apiKey         Your PerplexityAI API key.
-     * @param string                  $origin         Custom API origin (hostname).
-     * @param string                  $basePath       Custom base path.
-     */
     public function __construct(
         private readonly RequestFactoryInterface $requestFactory,
         private readonly StreamFactoryInterface $streamFactory,
@@ -59,232 +79,318 @@ class PerplexityAI
         #[SensitiveParameter]
         private readonly string $apiKey,
         private readonly string $origin = '',
-        private readonly string $basePath = ''
+        private readonly string $basePath = '',
     ) {}
 
     /**
-     * Magic method to call the PerplexityAI API endpoints.
+     * Calls a registered endpoint by its SDK method name.
      *
-     * @param string $key The endpoint method.
-     * @param array $args The arguments for the endpoint method.
+     * @param array<int, mixed> $args
      *
-     * @return ResponseInterface|null The API response or null if streaming.
-     *
-     * @throws PerplexityAIException       If the API returns an error.
-     * @throws InvalidArgumentException If the parameters are invalid.
+     * @throws PerplexityAIException If the API returns an error.
+     * @throws InvalidArgumentException If the endpoint or arguments are invalid.
+     * @throws Throwable If response streaming fails.
      */
     public function __call(string $key, array $args): ?ResponseInterface
     {
         $endpoint = PerplexityAIURLBuilder::getEndpoint($key);
-        $httpMethod = $endpoint['method'];
+        [$parameters, $body, $streamCallback, $customHeaders] = $this->extractCallArguments($args, $endpoint);
 
-        [$parameters, $opts, $streamCallback] = $this->extractCallArguments($args);
-
-        return $this->callAPI($httpMethod, $key, $parameters, $opts, $streamCallback);
+        return $this->request($key, $parameters, $body, $streamCallback, $customHeaders);
     }
 
     /**
-     * Extracts the arguments from the input array.
+     * Sends a request using a registered endpoint name.
      *
-     * @param array $args The input arguments.
-     *
-     * @return array An array containing the extracted parameters, options, and stream callback.
-     *
-     * @throws InvalidArgumentException If the first argument is not an array.
-     */
-    private function extractCallArguments(array $args): array
-    {
-        $parameters = [];
-        $opts = [];
-        $streamCallback = null;
-
-        if (!isset($args[0])) {
-            return [$parameters, $opts, $streamCallback];
-        }
-
-        if (\is_array($args[0])) {
-            $parameters = $args[0];
-
-            if (isset($args[1]) && \is_array($args[1])) {
-                $opts = $args[1];
-
-                if (isset($args[2]) && \is_callable($args[2])) {
-                    $streamCallback = $args[2];
-                }
-            } elseif (isset($args[1]) && \is_callable($args[1])) {
-                $streamCallback = $args[1];
-            }
-        } else {
-            throw new InvalidArgumentException('First argument must be an array of parameters.');
-        }
-
-        return [$parameters, $opts, $streamCallback];
-    }
-
-    /**
-     * Calls the PerplexityAI API with the provided method, key, parameters, and options.
-     *
-     * @param string $method The HTTP method for the request.
-     * @param string $key The API endpoint key.
-     * @param array $parameters Parameters for URL placeholders.
-     * @param array $opts The options for the request body or query.
-     * @param callable|null $streamCallback Callback function to handle streaming data.
-     *
-     * @return ResponseInterface|null The API response or null if streaming.
+     * @param array<string, mixed> $parameters Path and query parameters.
+     * @param array<string, mixed> $body JSON request body.
+     * @param callable(array<string, mixed>):void|null $streamCallback SSE event callback.
+     * @param array<string, string|string[]> $customHeaders Additional request headers.
      *
      * @throws PerplexityAIException If the API returns an error.
+     * @throws InvalidArgumentException If the endpoint or parameters are invalid.
+     * @throws Throwable If response streaming fails.
      */
-    private function callAPI(
-        string $method,
+    public function request(
         string $key,
         array $parameters = [],
-        array $opts = [],
-        ?callable $streamCallback = null
+        array $body = [],
+        ?callable $streamCallback = null,
+        array $customHeaders = [],
     ): ?ResponseInterface {
+        $endpoint = PerplexityAIURLBuilder::getEndpoint($key);
+        $pathParameters = $this->getPathParameters($endpoint['path']);
+        $pathKeys = \array_flip($pathParameters);
+        $pathValues = \array_intersect_key($parameters, $pathKeys);
+        $query = $endpoint['query'] ?? [];
+
+        foreach (\array_diff_key($parameters, $pathKeys) as $name => $value) {
+            $query[$name] = $value;
+        }
         $uri = PerplexityAIURLBuilder::createUrl(
             $this->uriFactory,
             $key,
-            $parameters,
+            $pathValues,
             $this->origin,
-            $this->basePath
+            $this->basePath,
         );
 
-        // Extract headers from opts
-        $customHeaders = $opts['customHeaders'] ?? [];
-        unset($opts['customHeaders']); // Remove headers from opts to avoid sending them in the body
+        if ($query !== []) {
+            $uri = $uri->withQuery(\http_build_query($query, '', '&', PHP_QUERY_RFC3986));
+        }
 
-        return $this->sendRequest($uri, $method, $opts, $streamCallback, $customHeaders);
+        return $this->sendRequest(
+            $uri,
+            $endpoint['method'],
+            $endpoint,
+            $body,
+            $streamCallback,
+            $customHeaders,
+        );
     }
 
     /**
-     * Sends an HTTP request to the PerplexityAI API and returns the response.
+     * Normalizes the legacy two-array convention and the canonical body-first convention.
      *
-     * @param UriInterface $uri The URI to send the request to.
-     * @param string $method The HTTP method to use.
-     * @param array $params Parameters to include in the request body.
-     * @param callable|null $streamCallback Callback function to handle streaming data.
+     * @param array<int, mixed> $args
+     * @param array{method:string,path:string,body?:string,basePath?:string,headers?:array<string,string|string[]>,query?:array<string,bool|float|int|string>,streaming?:bool,analytics?:bool}|null $endpoint
      *
-     * @return ResponseInterface|null The response from the PerplexityAI API or null if streaming.
+     * @return array{array<string,mixed>,array<string,mixed>,callable|null,array<string,string|string[]>}
+     *
+     * @throws InvalidArgumentException If endpoint arguments are invalid.
+     */
+    private function extractCallArguments(array $args, ?array $endpoint = null): array
+    {
+        if (\count($args) > 3) {
+            throw new InvalidArgumentException('Endpoint calls accept at most three arguments.');
+        }
+
+        if (isset($args[0]) && !\is_array($args[0])) {
+            throw new InvalidArgumentException('First argument must be an array of parameters.');
+        }
+
+        $first = $args[0] ?? [];
+        $second = [];
+        $hasSecondArray = isset($args[1]) && \is_array($args[1]);
+        $streamCallback = null;
+
+        if ($hasSecondArray) {
+            $second = $args[1];
+        } elseif (isset($args[1])) {
+            if (!\is_callable($args[1])) {
+                throw new InvalidArgumentException('Second argument must be an array or callable.');
+            }
+
+            $streamCallback = $args[1];
+        }
+
+        if (isset($args[2])) {
+            if (!$hasSecondArray || !\is_callable($args[2])) {
+                throw new InvalidArgumentException('Third argument must be a stream callback.');
+            }
+
+            $streamCallback = $args[2];
+        }
+
+        $customHeaders = $this->extractCustomHeaders($first, $second);
+
+        // Keep the old helper shape usable by reflective consumers.
+        if ($endpoint === null) {
+            return [$first, $second, $streamCallback, $customHeaders];
+        }
+
+        $bodyType = $endpoint['body'] ?? $this->inferBodyType($endpoint['method'], $endpoint['path']);
+
+        if ($bodyType === 'none') {
+            return [$first + $second, [], $streamCallback, $customHeaders];
+        }
+
+        // Existing 2.x calls pass path/query parameters first and the body second.
+        if ($hasSecondArray) {
+            return [$first, $second, $streamCallback, $customHeaders];
+        }
+
+        $pathParameters = $this->getPathParameters($endpoint['path']);
+
+        if ($pathParameters === []) {
+            return [[], $first, $streamCallback, $customHeaders];
+        }
+
+        $pathKeys = \array_flip($pathParameters);
+
+        return [
+            \array_intersect_key($first, $pathKeys),
+            \array_diff_key($first, $pathKeys),
+            $streamCallback,
+            $customHeaders,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $first
+     * @param array<string, mixed> $second
+     *
+     * @return array<string, string|string[]>
+     *
+     * @throws InvalidArgumentException If customHeaders is not an array.
+     */
+    private function extractCustomHeaders(array &$first, array &$second): array
+    {
+        $headers = [];
+
+        foreach ([$first, $second] as $values) {
+            if (!isset($values['customHeaders'])) {
+                continue;
+            }
+
+            if (!\is_array($values['customHeaders'])) {
+                throw new InvalidArgumentException('customHeaders must be an array.');
+            }
+
+            foreach ($values['customHeaders'] as $name => $value) {
+                $headers[$name] = $value;
+            }
+        }
+
+        unset($first['customHeaders'], $second['customHeaders']);
+
+        return $headers;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function getPathParameters(string $path): array
+    {
+        \preg_match_all('/\{([A-Za-z_]\w*)}/', $path, $matches);
+
+        return $matches[1];
+    }
+
+    private function inferBodyType(string $method, string $path): string
+    {
+        if (\in_array($method, ['GET', 'DELETE'], true)) {
+            return 'none';
+        }
+
+        return 'json';
+    }
+
+    /**
+     * @param array{path?:string,body?:string,basePath?:string,headers?:array<string,string|string[]>,streaming?:bool,analytics?:bool} $endpoint
+     * @param array<string, mixed> $body
+     * @param callable(array<string, mixed>):void|null $streamCallback
+     * @param array<string, string|string[]> $customHeaders
      *
      * @throws PerplexityAIException If the API returns an error.
+     * @throws Throwable If response streaming fails.
      */
     private function sendRequest(
         UriInterface $uri,
         string $method,
-        array $params = [],
-        ?callable $streamCallback = null,
-        array $customHeaders = []
-    ): ?ResponseInterface {
+        array $endpoint,
+        array $body,
+        ?callable $streamCallback,
+        array $customHeaders,
+    ): ResponseInterface {
+        $bodyType = $endpoint['body'] ?? $this->inferBodyType($method, $endpoint['path'] ?? $uri->getPath());
+        $requestBody = $this->createRequestBody($bodyType, $body);
+        $contentType = $requestBody !== null ? 'application/json' : null;
+        $headers = $endpoint['headers'] ?? [];
+
+        foreach ($customHeaders as $name => $value) {
+            $headers[$name] = $value;
+        }
+
         $request = $this->requestFactory->createRequest($method, $uri);
-        $headers = $this->createHeaders($customHeaders);
-        $request = $this->applyHeaders($request, $headers);
+        $request = $this->applyHeaders($request, $this->createHeaders($contentType, $headers));
 
-        $body = $this->createJsonBody($params);
-
-        if ($body !== '') {
-            $request = $request->withBody($this->streamFactory->createStream($body));
+        if ($requestBody !== null) {
+            $request = $request->withBody($requestBody);
         }
+
+        $isStreamingRequest = ($endpoint['streaming'] ?? false)
+            || ($body['stream'] ?? false) === true
+            || ($body['stream_format'] ?? null) === 'sse';
 
         try {
-            if ($streamCallback !== null && ($params['stream'] ?? false) === true) {
-                $this->handleStreamingResponse($request, $streamCallback);
-
-                return null;
-            }
-
-            $response = $this->httpClient->sendRequest($request);
-
-            if ($response->getStatusCode() >= 400) {
-                throw new PerplexityAIException($response->getBody()->getContents(), $response->getStatusCode());
-            }
-
-            return $response;
-        } catch (ClientExceptionInterface $e) {
-            throw new PerplexityAIException($e->getMessage(), $e->getCode(), $e);
+            $response = $isStreamingRequest && $this->httpClient instanceof StreamingClientInterface
+                ? $this->httpClient->sendStreamingRequest($request)
+                : $this->httpClient->sendRequest($request);
+        } catch (ClientExceptionInterface $exception) {
+            throw new PerplexityAIException($exception->getMessage(), (int) $exception->getCode(), $exception);
         }
-    }
 
-    /**
-     * Handles a streaming response from the API.
-     *
-     * @param RequestInterface $request        The request to send.
-     * @param callable         $streamCallback The callback function to handle streaming data.
-     *
-     * @return void
-     *
-     * @throws PerplexityAIException If an error occurs during streaming.
-     */
-    private function handleStreamingResponse(RequestInterface $request, callable $streamCallback): void
-    {
-        try {
-            $response = $this->httpClient->sendRequest($request);
-            $statusCode = $response->getStatusCode();
+        $this->throwForErrorResponse($response);
 
-            if ($statusCode >= 400) {
-                throw new PerplexityAIException($response->getBody()->getContents(), $statusCode);
-            }
+        $isEventStream = \str_contains(\strtolower($response->getHeaderLine('Content-Type')), 'text/event-stream');
+        $streamRequested = $isStreamingRequest;
 
-            $body = $response->getBody();
-            $buffer = '';
-
-            while (!$body->eof()) {
-                $chunk = $body->read(8192);
-                $buffer .= $chunk;
-
-                while (($newlinePos = \strpos($buffer, "\n")) !== false) {
-                    $line = \substr($buffer, 0, $newlinePos);
-                    $buffer = \substr($buffer, $newlinePos + 1);
-
-                    $data = \trim($line);
-
-                    if ($data === '') {
-                        continue;
-                    }
-
-                    if ($data === 'data: [DONE]') {
-                        return;
-                    }
-
-                    if (\str_starts_with($data, 'data: ')) {
-                        $json = \substr($data, 6);
-
-                        try {
-                            $decoded = \json_decode($json, true, 512, JSON_THROW_ON_ERROR);
-                            $streamCallback($decoded);
-                        } catch (JsonException $e) {
-                            throw new PerplexityAIException('JSON decode error: ' . $e->getMessage(), 0, $e);
-                        }
-                    }
-                }
-            }
-        } catch (ClientExceptionInterface $e) {
-            throw new PerplexityAIException($e->getMessage(), $e->getCode(), $e);
+        if ($streamCallback !== null && ($streamRequested || $isEventStream)) {
+            (new ServerSentEventDecoder())->decode($response->getBody(), $streamCallback);
         }
+
+        return $response;
     }
 
     /**
-     * Creates the headers for an API request.
+     * @param array<string, mixed> $body
      *
-     * @return array An associative array of headers.
+     * @throws PerplexityAIException If JSON encoding fails.
      */
-    private function createHeaders(array $customHeaders = []): array
+    private function createRequestBody(string $bodyType, array $body): ?StreamInterface
     {
-        $defaultHeaders = [
-            'Authorization' => 'Bearer ' . $this->apiKey,
-            'Content-Type' => 'application/json',
-        ];
+        if ($body === [] || $bodyType === 'none') {
+            return null;
+        }
 
-        // Merge custom headers, overriding defaults if necessary
-        return \array_merge($defaultHeaders, $customHeaders);
+        return $this->streamFactory->createStream($this->createJsonBody($body));
     }
 
     /**
-     * Applies the headers to the given request.
+     * @throws PerplexityAIException If the API returns an error response.
+     */
+    private function throwForErrorResponse(ResponseInterface $response): void
+    {
+        if ($response->getStatusCode() < 400) {
+            return;
+        }
+
+        throw new PerplexityAIException(
+            $response->getBody()->getContents(),
+            $response->getStatusCode(),
+            null,
+            $response->getHeaderLine('x-request-id'),
+            $response->getHeaders(),
+        );
+    }
+
+    /**
+     * The bool form is retained for backwards compatibility with reflective test helpers.
      *
-     * @param RequestInterface $request The request to apply headers to.
-     * @param array            $headers An associative array of headers to apply.
-     *
-     * @return RequestInterface The request with headers applied.
+     * @param bool|string|null $contentType
+     * @param array<string, string|string[]> $customHeaders
+     * @return array<string, string|string[]>
+     */
+    private function createHeaders(
+        bool|string|null $contentType,
+        array $customHeaders = [],
+    ): array {
+        if (\is_bool($contentType)) {
+            $contentType = $contentType ? 'application/json' : null;
+        }
+
+        $headers = ['Authorization' => 'Bearer ' . $this->apiKey];
+
+        if ($contentType !== null) {
+            $headers['Content-Type'] = $contentType;
+        }
+
+        return \array_replace($headers, $customHeaders);
+    }
+
+    /**
+     * @param array<string, string|string[]> $headers
      */
     private function applyHeaders(RequestInterface $request, array $headers): RequestInterface
     {
@@ -296,24 +402,16 @@ class PerplexityAI
     }
 
     /**
-     * Creates a JSON-encoded body string from the given parameters.
-     *
-     * @param array $params An associative array of parameters to encode as JSON.
-     *
-     * @return string The JSON-encoded body string.
+     * @param array<string, mixed> $params
      *
      * @throws PerplexityAIException If JSON encoding fails.
      */
     private function createJsonBody(array $params): string
     {
-        if (empty($params)) {
-            return '';
-        }
-
         try {
             return \json_encode($params, JSON_THROW_ON_ERROR);
-        } catch (JsonException $e) {
-            throw new PerplexityAIException('JSON encode error: ' . $e->getMessage(), 0, $e);
+        } catch (JsonException $exception) {
+            throw new PerplexityAIException('JSON encode error: ' . $exception->getMessage(), 0, $exception);
         }
     }
 }

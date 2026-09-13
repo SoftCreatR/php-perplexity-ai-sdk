@@ -16,22 +16,9 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-require_once __DIR__ . '/../PerplexityAIFactory.php';
+require_once \dirname(__DIR__) . '/PerplexityAIFactory.php';
 
-// Call the createChatCompletion method.
-PerplexityAIFactory::request(
-    'createChatCompletion',
-    [
-        'model' => 'llama-3.1-sonar-small-128k-online',
-        'messages' => [
-            [
-                'role' => 'system',
-                'content' => 'Be precise and concise.',
-            ],
-            [
-                'role' => 'user',
-                'content' => 'How many stars are there in our galaxy?',
-            ],
-        ],
-    ]
-);
+// GET /v1/agent/{id}/files
+PerplexityAIFactory::request('listAgentResponseFiles', [
+    'id' => PerplexityAIFactory::env('PERPLEXITY_AGENT_RESPONSE_ID'),
+]);

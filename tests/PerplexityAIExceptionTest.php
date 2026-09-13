@@ -1,7 +1,7 @@
 <?php
 
 /*
- * Copyright (c) 2023-present, Sascha Greuel and Contributors
+ * Copyright (c) 2024-present, Sascha Greuel and Contributors
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -60,6 +60,8 @@ final class PerplexityAIExceptionTest extends TestCase
 
         $exception = new PerplexityAIException($jsonErrorMessage);
         $this->assertEquals('Invalid API key provided.', $exception->getMessage());
+        $this->assertSame('authentication_error', $exception->getError()['type']);
+        $this->assertSame($jsonErrorMessage, $exception->getResponseBody());
     }
 
     /**
@@ -141,6 +143,25 @@ final class PerplexityAIExceptionTest extends TestCase
         $exception = new PerplexityAIException('Error message', 0, $previous);
 
         $this->assertSame($previous, $exception->getPrevious());
+    }
+
+    public function testConstructRetainsResponseMetadata(): void
+    {
+        $headers = [
+            'x-request-id' => ['req_123'],
+            'x-ratelimit-remaining-requests' => ['42'],
+        ];
+        $exception = new PerplexityAIException(
+            '{"error":{"message":"Nope","code":"invalid_request"}}',
+            400,
+            null,
+            'req_123',
+            $headers,
+        );
+
+        $this->assertSame('req_123', $exception->getRequestId());
+        $this->assertSame($headers, $exception->getResponseHeaders());
+        $this->assertSame('invalid_request', $exception->getError()['code']);
     }
 
     /**

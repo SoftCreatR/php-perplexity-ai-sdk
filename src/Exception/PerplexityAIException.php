@@ -25,14 +25,24 @@ use Throwable;
 use const JSON_THROW_ON_ERROR;
 
 /**
- * Exception class for handling errors in the PerplexityAI API client.
+ * Exception class for handling errors in the Perplexity API client.
  *
- * This exception is thrown when the PerplexityAI API client encounters an error.
+ * This exception is thrown when the Perplexity API client encounters an error.
  * It attempts to extract a meaningful error message from the API response,
  * which may be in JSON format containing an "error" object.
  */
 class PerplexityAIException extends Exception
 {
+    /** @var array<string, mixed>|null */
+    private ?array $error = null;
+
+    /** @var array<string, string[]> */
+    private array $responseHeaders;
+
+    private ?string $responseBody;
+
+    private ?string $requestId;
+
     /**
      * Constructs a new PerplexityAIException instance.
      *
@@ -40,12 +50,20 @@ class PerplexityAIException extends Exception
      *                                 that message will be used instead.
      * @param int            $code     The exception code.
      * @param Throwable|null $previous The previous exception used for exception chaining.
+     * @param string|null $requestId The Perplexity request identifier, when available.
+     * @param array<string, string[]> $responseHeaders Response headers, when available.
      */
     public function __construct(
         ?string $message,
         int $code = 0,
-        ?Throwable $previous = null
+        ?Throwable $previous = null,
+        ?string $requestId = null,
+        array $responseHeaders = [],
     ) {
+        $this->responseBody = $message;
+        $this->requestId = $requestId !== '' ? $requestId : null;
+        $this->responseHeaders = $responseHeaders;
+
         if (empty($message)) {
             $message = 'An unknown error occurred';
         } else {
@@ -53,6 +71,32 @@ class PerplexityAIException extends Exception
         }
 
         parent::__construct($message, $code, $previous);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function getError(): ?array
+    {
+        return $this->error;
+    }
+
+    public function getRequestId(): ?string
+    {
+        return $this->requestId;
+    }
+
+    public function getResponseBody(): ?string
+    {
+        return $this->responseBody;
+    }
+
+    /**
+     * @return array<string, string[]>
+     */
+    public function getResponseHeaders(): array
+    {
+        return $this->responseHeaders;
     }
 
     /**
@@ -70,8 +114,12 @@ class PerplexityAIException extends Exception
         try {
             $decoded = \json_decode($errorMessage, true, 512, JSON_THROW_ON_ERROR);
 
-            if (isset($decoded['error']['message']) && \is_string($decoded['error']['message'])) {
-                return $decoded['error']['message'];
+            if (isset($decoded['error']) && \is_array($decoded['error'])) {
+                $this->error = $decoded['error'];
+
+                if (isset($decoded['error']['message']) && \is_string($decoded['error']['message'])) {
+                    return $decoded['error']['message'];
+                }
             }
         } catch (JsonException) {
             // Ignore JSON decoding errors and return the original message

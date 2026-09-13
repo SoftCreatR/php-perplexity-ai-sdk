@@ -22,25 +22,65 @@ use InvalidArgumentException;
 use Psr\Http\Message\UriFactoryInterface;
 use Psr\Http\Message\UriInterface;
 
-/**
- * Utility class for creating URLs for PerplexityAI API endpoints.
- */
 class PerplexityAIURLBuilder
 {
     public const ORIGIN = 'api.perplexity.ai';
 
-    public const BASE_PATH = '';
+    public const BASE_PATH = '/v1';
 
     private const HTTP_METHOD_POST = 'POST';
 
+    private const HTTP_METHOD_GET = 'GET';
+
     /**
-     * Configuration of PerplexityAI API endpoints.
+     * Configuration of Perplexity API endpoints.
      *
-     * @var array<string, array{method: string, path: string}>
+     * @var array<string, array{
+     *     method: string,
+     *     path: string,
+     *     category: string,
+     *     body: 'none'|'json',
+     *     basePath?: string,
+     *     headers?: array<string, string|string[]>,
+     *     query?: array<string, bool|float|int|string>,
+     *     streaming?: bool,
+     *     analytics?: bool
+     * }>
      */
     private static array $urlEndpoints = [
-        // Chat Completion
-        'createChatCompletion' => ['method' => self::HTTP_METHOD_POST, 'path' => '/chat/completions'],
+        // Agent API
+        'createAgentResponse' => ['method' => self::HTTP_METHOD_POST, 'path' => '/agent', 'category' => 'agent', 'body' => 'json'],
+        'retrieveAgentResponse' => ['method' => self::HTTP_METHOD_GET, 'path' => '/agent/{id}', 'category' => 'agent', 'body' => 'none'],
+        'listAgentResponseFiles' => ['method' => self::HTTP_METHOD_GET, 'path' => '/agent/{id}/files', 'category' => 'agent', 'body' => 'none'],
+        'downloadAgentResponseFile' => ['method' => self::HTTP_METHOD_GET, 'path' => '/agent/{id}/files/{file_id}/content', 'category' => 'agent', 'body' => 'none'],
+        'cancelAgentResponse' => ['method' => self::HTTP_METHOD_POST, 'path' => '/agent/{id}/cancel', 'category' => 'agent', 'body' => 'none'],
+
+        // Sonar API
+        'createChatCompletion' => ['method' => self::HTTP_METHOD_POST, 'path' => '/sonar', 'category' => 'sonar', 'body' => 'json'],
+        'createAsyncChatCompletion' => ['method' => self::HTTP_METHOD_POST, 'path' => '/async/sonar', 'category' => 'sonar/async', 'body' => 'json'],
+        'listAsyncChatCompletions' => ['method' => self::HTTP_METHOD_GET, 'path' => '/async/sonar', 'category' => 'sonar/async', 'body' => 'none'],
+        'retrieveAsyncChatCompletion' => ['method' => self::HTTP_METHOD_GET, 'path' => '/async/sonar/{api_request}', 'category' => 'sonar/async', 'body' => 'none'],
+
+        // Search, embeddings, and models
+        'search' => ['method' => self::HTTP_METHOD_POST, 'path' => '/search', 'category' => 'search', 'body' => 'json', 'basePath' => ''],
+        'createEmbedding' => ['method' => self::HTTP_METHOD_POST, 'path' => '/embeddings', 'category' => 'embeddings', 'body' => 'json'],
+        'createContextualizedEmbedding' => ['method' => self::HTTP_METHOD_POST, 'path' => '/contextualizedembeddings', 'category' => 'embeddings', 'body' => 'json'],
+        'listModels' => ['method' => self::HTTP_METHOD_GET, 'path' => '/models', 'category' => 'models', 'body' => 'none'],
+
+        // Router API
+        'createRouterChatCompletion' => ['method' => self::HTTP_METHOD_POST, 'path' => '/router/v1/chat/completions', 'category' => 'router/chat', 'body' => 'json', 'basePath' => ''],
+        'createRouterMessage' => ['method' => self::HTTP_METHOD_POST, 'path' => '/router/v1/messages', 'category' => 'router/messages', 'body' => 'json', 'basePath' => ''],
+        'createRouterResponse' => ['method' => self::HTTP_METHOD_POST, 'path' => '/router/v1/responses', 'category' => 'router/responses', 'body' => 'json', 'basePath' => ''],
+        'listRouterModels' => ['method' => self::HTTP_METHOD_GET, 'path' => '/router/v1/models', 'category' => 'router/models', 'body' => 'none', 'basePath' => ''],
+        'retrieveRouterModel' => ['method' => self::HTTP_METHOD_GET, 'path' => '/router/v1/models/{model}', 'category' => 'router/models', 'body' => 'none', 'basePath' => ''],
+
+        // Authentication
+        'generateAuthToken' => ['method' => self::HTTP_METHOD_POST, 'path' => '/generate_auth_token', 'category' => 'authentication', 'body' => 'json', 'basePath' => ''],
+        'revokeAuthToken' => ['method' => self::HTTP_METHOD_POST, 'path' => '/revoke_auth_token', 'category' => 'authentication', 'body' => 'json', 'basePath' => ''],
+
+        // Analytics
+        'getComputerUsageAnalytics' => ['method' => self::HTTP_METHOD_GET, 'path' => '/analytics/computer/usage', 'category' => 'analytics', 'body' => 'none', 'analytics' => true],
+        'getComputerUsageAnalyticsV2' => ['method' => self::HTTP_METHOD_GET, 'path' => '/analytics/computer/usage', 'category' => 'analytics', 'body' => 'none', 'basePath' => '/v2', 'analytics' => true],
     ];
 
     /**
@@ -52,11 +92,41 @@ class PerplexityAIURLBuilder
     }
 
     /**
-     * Gets the PerplexityAI API endpoint configuration.
+     * Gets all Perplexity API endpoint configurations.
+     *
+     * @return array<string, array{
+     *     method: string,
+     *     path: string,
+     *     category: string,
+     *     body: 'none'|'json',
+     *     basePath?: string,
+     *     headers?: array<string, string|string[]>,
+     *     query?: array<string, bool|float|int|string>,
+     *     streaming?: bool,
+     *     analytics?: bool
+     * }>
+     */
+    public static function getEndpoints(): array
+    {
+        return self::$urlEndpoints;
+    }
+
+    /**
+     * Gets the Perplexity API endpoint configuration.
      *
      * @param string $key The endpoint key.
      *
-     * @return array{method: string, path: string} The endpoint configuration.
+     * @return array{
+     *     method: string,
+     *     path: string,
+     *     category: string,
+     *     body: 'none'|'json',
+     *     basePath?: string,
+     *     headers?: array<string, string|string[]>,
+     *     query?: array<string, bool|float|int|string>,
+     *     streaming?: bool,
+     *     analytics?: bool
+     * } The endpoint configuration.
      *
      * @throws InvalidArgumentException If the provided key is invalid.
      */
@@ -70,12 +140,12 @@ class PerplexityAIURLBuilder
     }
 
     /**
-     * Creates a URL for the specified PerplexityAI API endpoint.
+     * Creates a URL for the specified Perplexity API endpoint.
      *
      * @param UriFactoryInterface  $uriFactory The PSR-17 URI factory instance used for creating URIs.
      * @param string               $key        The key representing the API endpoint.
      * @param array<string, mixed> $parameters Optional parameters to replace in the endpoint path.
-     * @param string               $origin     Custom origin (hostname), if needed.
+     * @param string               $origin     Custom origin (hostname or absolute base URL), if needed.
      * @param string               $basePath   Custom base path, if needed.
      *
      * @return UriInterface The fully constructed URL for the API endpoint.
@@ -87,22 +157,36 @@ class PerplexityAIURLBuilder
         string $key,
         array $parameters = [],
         string $origin = '',
-        string $basePath = ''
+        string $basePath = '',
     ): UriInterface {
         $endpoint = self::getEndpoint($key);
-        $path = self::replacePathParameters($endpoint['path'], $parameters);
+        $endpointPath = self::replacePathParameters($endpoint['path'], $parameters);
+        $isAbsoluteOrigin = $origin !== '' && \preg_match('#^[a-z][a-z0-9+.-]*://#i', $origin) === 1;
 
-        return $uriFactory
-            ->createUri()
-            ->withScheme('https')
-            ->withHost($origin !== '' ? $origin : self::ORIGIN)
-            ->withPath(\trim($basePath !== '' ? $basePath : self::BASE_PATH, '/') . $path);
+        if ($isAbsoluteOrigin) {
+            $uri = $uriFactory->createUri($origin);
+            $originBasePath = $uri->getPath();
+        } else {
+            $uri = $uriFactory
+                ->createUri()
+                ->withScheme('https')
+                ->withHost($origin !== '' ? $origin : self::ORIGIN);
+            $originBasePath = '';
+        }
+
+        $endpointBasePath = $endpoint['basePath'] ?? self::BASE_PATH;
+        $resolvedBasePath = $basePath !== ''
+            ? $basePath
+            : ($isAbsoluteOrigin ? $originBasePath : $endpointBasePath);
+        $path = \rtrim('/' . \trim($resolvedBasePath, '/'), '/') . '/' . \ltrim($endpointPath, '/');
+
+        return $uri->withPath($path);
     }
 
     /**
      * Replaces path parameters in the given path with provided parameter values.
      *
-     * @param string              $path       The path containing parameter placeholders.
+     * @param string               $path       The path containing parameter placeholders.
      * @param array<string, mixed> $parameters The parameter values to replace placeholders in the path.
      *
      * @return string The path with replaced parameter values.
@@ -111,24 +195,22 @@ class PerplexityAIURLBuilder
      */
     private static function replacePathParameters(string $path, array $parameters): string
     {
-        return \preg_replace_callback('/\{(\w+)}/', static function ($matches) use ($parameters) {
+        return \preg_replace_callback('/\{([A-Za-z_]\w*)}/', static function (array $matches) use ($parameters): string {
             $key = $matches[1];
 
             if (!\array_key_exists($key, $parameters)) {
                 throw new InvalidArgumentException(\sprintf('Missing path parameter "%s".', $key));
             }
 
-            $value = $parameters[$key];
-
-            if (!\is_scalar($value)) {
+            if (!\is_scalar($parameters[$key])) {
                 throw new InvalidArgumentException(\sprintf(
                     'Parameter "%s" must be a scalar value, %s given.',
                     $key,
-                    \gettype($value)
+                    \gettype($parameters[$key]),
                 ));
             }
 
-            return (string)$value;
+            return \rawurlencode((string) $parameters[$key]);
         }, $path);
     }
 }

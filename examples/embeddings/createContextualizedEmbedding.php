@@ -1,0 +1,28 @@
+<?php
+
+/*
+ * Copyright (c) 2023-present, Sascha Greuel and Contributors
+ *
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
+
+require_once \dirname(__DIR__) . '/PerplexityAIFactory.php';
+
+// POST /v1/contextualizedembeddings
+PerplexityAIFactory::request('createContextualizedEmbedding', [], [
+    'model' => 'pplx-embed-context-v1-0.6b',
+    'input' => [[
+        'PHP 8.5 was released after PHP 8.4.',
+        'Each sentence belongs to the same document.',
+    ]],
+]);

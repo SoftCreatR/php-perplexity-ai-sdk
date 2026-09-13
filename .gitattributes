@@ -1,0 +1,8 @@
+# .gitattributes
+/* export-ignore
+/.* export-ignore
+/src -export-ignore
+/composer.json -export-ignore
+
+# Auto detect text files and perform LF normalization
+* text=auto
