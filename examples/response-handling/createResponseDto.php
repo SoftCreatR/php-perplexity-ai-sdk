@@ -18,18 +18,28 @@
 
 require_once \dirname(__DIR__) . '/PerplexityAIFactory.php';
 
-// POST /v1/sonar (SSE)
-PerplexityAIFactory::request(
-    'createChatCompletion',
-    [],
-    [
-        'model' => 'sonar',
-        'messages' => [['role' => 'user', 'content' => 'What is the capital of France?']],
-        'stream' => true,
-    ],
-    static function (mixed $event): void {
-        if (\is_array($event)) {
-            echo $event['choices'][0]['delta']['content'] ?? '';
-        }
-    },
-);
+use SoftCreatR\PerplexityAI\Response\ModelResponse;
+
+$client = PerplexityAIFactory::create(PerplexityAIFactory::env('PERPLEXITY_API_KEY'));
+$response = $client->createAgentResponse([
+    'model' => 'openai/gpt-6.1-sol',
+    'reasoning' => ['effort' => 'low'],
+    'input' => 'Explain PSR-18 in one sentence.',
+    'max_output_tokens' => 1024,
+]);
+
+if ($response === null) {
+    throw new RuntimeException('Perplexity did not return an HTTP response.');
+}
+
+$dto = ModelResponse::fromResponse($response);
+
+echo json_encode([
+    'id' => $dto->id,
+    'model' => $dto->model,
+    'status' => $dto->status,
+    'request_id' => $dto->getRequestId(),
+    'text' => $dto->getOutputText(),
+    'refusals' => $dto->getRefusals(),
+    'usage' => $dto->usage,
+], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR) . PHP_EOL;

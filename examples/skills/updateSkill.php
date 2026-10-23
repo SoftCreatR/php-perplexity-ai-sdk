@@ -16,7 +16,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-require_once \dirname(__DIR__, 2) . '/PerplexityAIFactory.php';
+require_once \dirname(__DIR__) . '/PerplexityAIFactory.php';
 
-// GET /v1/async/sonar
-PerplexityAIFactory::request('listAsyncChatCompletions');
+// PUT /v1/skills/{skill_id}
+PerplexityAIFactory::request('updateSkill', [
+    'skill_id' => PerplexityAIFactory::env('PERPLEXITY_SKILL_ID'),
+    'expected_revision' => PerplexityAIFactory::env('PERPLEXITY_SKILL_REVISION'),
+], ['file' => __DIR__ . '/fixtures/skills.zip']);

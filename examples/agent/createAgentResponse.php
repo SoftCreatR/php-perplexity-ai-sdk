@@ -20,7 +20,8 @@ require_once \dirname(__DIR__) . '/PerplexityAIFactory.php';
 
 // POST /v1/agent
 PerplexityAIFactory::request('createAgentResponse', [], [
-    'model' => 'openai/gpt-5-mini',
+    'model' => 'openai/gpt-6.1-sol',
+    'reasoning' => ['effort' => 'low'],
     'input' => 'Explain the differences between PHP fibers and generators.',
-    'max_output_tokens' => 256,
+    'max_output_tokens' => 1024,
 ]);

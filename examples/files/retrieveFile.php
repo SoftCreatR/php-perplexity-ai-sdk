@@ -16,10 +16,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-require_once \dirname(__DIR__, 2) . '/PerplexityAIFactory.php';
+require_once \dirname(__DIR__) . '/PerplexityAIFactory.php';
 
-// POST /router/v1/chat/completions
-PerplexityAIFactory::request('createRouterChatCompletion', [], [
-    'model' => PerplexityAIFactory::env('PERPLEXITY_ROUTER_MODEL', 'perplexity/kimi-k3'),
-    'messages' => [['role' => 'user', 'content' => 'Explain PHP readonly classes.']],
-]);
+// GET /v1/files/{file_id}
+PerplexityAIFactory::request('retrieveFile', ['file_id' => PerplexityAIFactory::env('PERPLEXITY_FILE_ID')], []);

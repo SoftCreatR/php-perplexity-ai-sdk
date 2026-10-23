@@ -18,6 +18,7 @@
 
 namespace SoftCreatR\PerplexityAI;
 
+use Exception;
 use InvalidArgumentException;
 use JsonException;
 use Psr\Http\Client\ClientExceptionInterface;
@@ -31,6 +32,7 @@ use Psr\Http\Message\UriFactoryInterface;
 use Psr\Http\Message\UriInterface;
 use SensitiveParameter;
 use SoftCreatR\PerplexityAI\Exception\PerplexityAIException;
+use SoftCreatR\PerplexityAI\Http\MultipartBodyBuilder;
 use SoftCreatR\PerplexityAI\Http\ServerSentEventDecoder;
 use SoftCreatR\PerplexityAI\Http\StreamingClientInterface;
 use Throwable;
@@ -45,28 +47,41 @@ use const PHP_QUERY_RFC3986;
  * See README.md for the complete method catalog.
  *
  * API METHODS START
+ * @method ResponseInterface|null cancelAgentResponse(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null cancelBatch(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
  * @method ResponseInterface|null createAgentResponse(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
- * @method ResponseInterface|null retrieveAgentResponse(array<string, mixed> $parameters = [])
- * @method ResponseInterface|null listAgentResponseFiles(array<string, mixed> $parameters = [])
- * @method ResponseInterface|null downloadAgentResponseFile(array<string, mixed> $parameters = [])
- * @method ResponseInterface|null cancelAgentResponse(array<string, mixed> $parameters = [])
- * @method ResponseInterface|null createChatCompletion(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
- * @method ResponseInterface|null createAsyncChatCompletion(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
- * @method ResponseInterface|null listAsyncChatCompletions(array<string, mixed> $parameters = [])
- * @method ResponseInterface|null retrieveAsyncChatCompletion(array<string, mixed> $parameters = [])
- * @method ResponseInterface|null search(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
- * @method ResponseInterface|null createEmbedding(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null createBatch(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
  * @method ResponseInterface|null createContextualizedEmbedding(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
- * @method ResponseInterface|null listModels(array<string, mixed> $parameters = [])
- * @method ResponseInterface|null createRouterChatCompletion(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
- * @method ResponseInterface|null createRouterMessage(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
- * @method ResponseInterface|null createRouterResponse(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
- * @method ResponseInterface|null listRouterModels(array<string, mixed> $parameters = [])
- * @method ResponseInterface|null retrieveRouterModel(array<string, mixed> $parameters = [])
+ * @method ResponseInterface|null createDecision(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null createEmbedding(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null createOrchestratorChatCompletion(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null createOrchestratorMessage(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null createOrchestratorResponse(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null createSkill(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null deleteFile(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null deleteSkill(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null downloadAgentResponseFile(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null downloadFileContent(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null downloadSkill(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
  * @method ResponseInterface|null generateAuthToken(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null getComputerUsageAnalytics(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null getComputerUsageAnalyticsV2(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null listAgentResponseFiles(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null listBatches(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null listFiles(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null listModels(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null listOrchestratorModels(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null listSkillRevisions(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null listSkills(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null retrieveAgentResponse(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null retrieveBatch(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null retrieveFile(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null retrieveOrchestratorModel(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null retrieveSkill(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
  * @method ResponseInterface|null revokeAuthToken(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
- * @method ResponseInterface|null getComputerUsageAnalytics(array<string, mixed> $parameters = [])
- * @method ResponseInterface|null getComputerUsageAnalyticsV2(array<string, mixed> $parameters = [])
+ * @method ResponseInterface|null search(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null updateSkill(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
+ * @method ResponseInterface|null uploadFile(array<string, mixed> $parametersOrBody = [], array<string, mixed>|callable|null $bodyOrCallback = [], ?callable $streamCallback = null)
  * API METHODS END
  */
 class PerplexityAI
@@ -89,7 +104,7 @@ class PerplexityAI
      *
      * @throws PerplexityAIException If the API returns an error.
      * @throws InvalidArgumentException If the endpoint or arguments are invalid.
-     * @throws Throwable If response streaming fails.
+     * @throws Throwable If multipart construction or response streaming fails.
      */
     public function __call(string $key, array $args): ?ResponseInterface
     {
@@ -109,7 +124,7 @@ class PerplexityAI
      *
      * @throws PerplexityAIException If the API returns an error.
      * @throws InvalidArgumentException If the endpoint or parameters are invalid.
-     * @throws Throwable If response streaming fails.
+     * @throws Throwable If multipart construction or response streaming fails.
      */
     public function request(
         string $key,
@@ -150,16 +165,16 @@ class PerplexityAI
     }
 
     /**
-     * Normalizes the legacy two-array convention and the canonical body-first convention.
+     * Normalizes body-first calls and explicit parameter/body pairs.
      *
      * @param array<int, mixed> $args
-     * @param array{method:string,path:string,body?:string,basePath?:string,headers?:array<string,string|string[]>,query?:array<string,bool|float|int|string>,streaming?:bool,analytics?:bool}|null $endpoint
+     * @param array{method:string,path:string,body:string,fileFields?:list<string>,basePath?:string,headers?:array<string,string|string[]>,query?:array<string,bool|float|int|string>,streaming?:bool,analytics?:bool} $endpoint
      *
      * @return array{array<string,mixed>,array<string,mixed>,callable|null,array<string,string|string[]>}
      *
      * @throws InvalidArgumentException If endpoint arguments are invalid.
      */
-    private function extractCallArguments(array $args, ?array $endpoint = null): array
+    private function extractCallArguments(array $args, array $endpoint): array
     {
         if (\count($args) > 3) {
             throw new InvalidArgumentException('Endpoint calls accept at most three arguments.');
@@ -194,18 +209,12 @@ class PerplexityAI
 
         $customHeaders = $this->extractCustomHeaders($first, $second);
 
-        // Keep the old helper shape usable by reflective consumers.
-        if ($endpoint === null) {
-            return [$first, $second, $streamCallback, $customHeaders];
-        }
-
-        $bodyType = $endpoint['body'] ?? $this->inferBodyType($endpoint['method'], $endpoint['path']);
+        $bodyType = $endpoint['body'];
 
         if ($bodyType === 'none') {
             return [$first + $second, [], $streamCallback, $customHeaders];
         }
 
-        // Existing 2.x calls pass path/query parameters first and the body second.
         if ($hasSecondArray) {
             return [$first, $second, $streamCallback, $customHeaders];
         }
@@ -267,23 +276,14 @@ class PerplexityAI
         return $matches[1];
     }
 
-    private function inferBodyType(string $method, string $path): string
-    {
-        if (\in_array($method, ['GET', 'DELETE'], true)) {
-            return 'none';
-        }
-
-        return 'json';
-    }
-
     /**
-     * @param array{path?:string,body?:string,basePath?:string,headers?:array<string,string|string[]>,streaming?:bool,analytics?:bool} $endpoint
+     * @param array{path:string,body:string,fileFields?:list<string>,basePath?:string,headers?:array<string,string|string[]>,streaming?:bool,analytics?:bool} $endpoint
      * @param array<string, mixed> $body
      * @param callable(array<string, mixed>):void|null $streamCallback
      * @param array<string, string|string[]> $customHeaders
      *
      * @throws PerplexityAIException If the API returns an error.
-     * @throws Throwable If response streaming fails.
+     * @throws Throwable If multipart construction or response streaming fails.
      */
     private function sendRequest(
         UriInterface $uri,
@@ -293,9 +293,16 @@ class PerplexityAI
         ?callable $streamCallback,
         array $customHeaders,
     ): ResponseInterface {
-        $bodyType = $endpoint['body'] ?? $this->inferBodyType($method, $endpoint['path'] ?? $uri->getPath());
-        $requestBody = $this->createRequestBody($bodyType, $body);
-        $contentType = $requestBody !== null ? 'application/json' : null;
+        $bodyType = $endpoint['body'];
+        $boundary = $body !== [] && $bodyType === 'multipart' ? $this->generateMultipartBoundary() : null;
+        $requestBody = $this->createRequestBody($bodyType, $body, $boundary, $endpoint['fileFields'] ?? []);
+        $contentType = null;
+
+        if ($requestBody !== null) {
+            $contentType = $bodyType === 'multipart'
+                ? "multipart/form-data; boundary={$boundary}"
+                : 'application/json';
+        }
         $headers = $endpoint['headers'] ?? [];
 
         foreach ($customHeaders as $name => $value) {
@@ -335,16 +342,34 @@ class PerplexityAI
 
     /**
      * @param array<string, mixed> $body
+     * @param list<string> $fileFields
      *
      * @throws PerplexityAIException If JSON encoding fails.
+     * @throws Throwable If multipart body construction fails.
      */
-    private function createRequestBody(string $bodyType, array $body): ?StreamInterface
-    {
+    private function createRequestBody(
+        string $bodyType,
+        array $body,
+        ?string $boundary = null,
+        array $fileFields = [],
+    ): ?StreamInterface {
         if ($body === [] || $bodyType === 'none') {
             return null;
         }
 
+        if ($bodyType === 'multipart') {
+            return (new MultipartBodyBuilder($this->streamFactory))->build($body, (string) $boundary, $fileFields);
+        }
+
         return $this->streamFactory->createStream($this->createJsonBody($body));
+    }
+
+    /**
+     * @throws Exception If the operating system cannot provide random bytes.
+     */
+    private function generateMultipartBoundary(): string
+    {
+        return '----PerplexityAI' . \bin2hex(\random_bytes(16));
     }
 
     /**
@@ -366,20 +391,13 @@ class PerplexityAI
     }
 
     /**
-     * The bool form is retained for backwards compatibility with reflective test helpers.
-     *
-     * @param bool|string|null $contentType
      * @param array<string, string|string[]> $customHeaders
      * @return array<string, string|string[]>
      */
     private function createHeaders(
-        bool|string|null $contentType,
+        ?string $contentType,
         array $customHeaders = [],
     ): array {
-        if (\is_bool($contentType)) {
-            $contentType = $contentType ? 'application/json' : null;
-        }
-
         $headers = ['Authorization' => 'Bearer ' . $this->apiKey];
 
         if ($contentType !== null) {

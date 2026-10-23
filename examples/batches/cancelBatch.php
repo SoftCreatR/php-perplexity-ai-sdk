@@ -16,9 +16,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-require_once \dirname(__DIR__, 2) . '/PerplexityAIFactory.php';
+require_once \dirname(__DIR__) . '/PerplexityAIFactory.php';
 
-// GET /router/v1/models/{model}
-PerplexityAIFactory::request('retrieveRouterModel', [
-    'model' => PerplexityAIFactory::env('PERPLEXITY_ROUTER_MODEL', 'perplexity/kimi-k3'),
-]);
+// POST /v1/batches/{batch_id}/cancel
+PerplexityAIFactory::request('cancelBatch', ['batch_id' => PerplexityAIFactory::env('PERPLEXITY_BATCH_ID')], []);

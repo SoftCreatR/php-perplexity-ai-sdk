@@ -16,10 +16,11 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-require_once \dirname(__DIR__, 2) . '/PerplexityAIFactory.php';
+require_once \dirname(__DIR__) . '/PerplexityAIFactory.php';
 
-// POST /router/v1/responses
-PerplexityAIFactory::request('createRouterResponse', [], [
-    'model' => PerplexityAIFactory::env('PERPLEXITY_ROUTER_MODEL', 'perplexity/kimi-k3'),
-    'input' => 'Explain PHP readonly classes.',
+// POST /v1/batches
+PerplexityAIFactory::request('createBatch', [], [
+    'input_file_id' => PerplexityAIFactory::env('PERPLEXITY_FILE_ID'),
+    'endpoint' => '/v1/responses',
+    'completion_window' => '24h',
 ]);

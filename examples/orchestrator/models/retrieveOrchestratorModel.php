@@ -18,7 +18,7 @@
 
 require_once \dirname(__DIR__, 2) . '/PerplexityAIFactory.php';
 
-// GET /v1/async/sonar/{api_request}
-PerplexityAIFactory::request('retrieveAsyncChatCompletion', [
-    'api_request' => PerplexityAIFactory::env('PERPLEXITY_ASYNC_REQUEST_ID'),
+// GET /orchestrator/v1/models/{model}
+PerplexityAIFactory::request('retrieveOrchestratorModel', [
+    'model' => PerplexityAIFactory::env('PERPLEXITY_ORCHESTRATOR_MODEL', 'perplexity/kimi-k3'),
 ]);

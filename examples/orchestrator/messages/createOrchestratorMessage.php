@@ -18,9 +18,9 @@
 
 require_once \dirname(__DIR__, 2) . '/PerplexityAIFactory.php';
 
-// POST /router/v1/messages
-PerplexityAIFactory::request('createRouterMessage', [], [
-    'model' => PerplexityAIFactory::env('PERPLEXITY_ROUTER_MODEL', 'perplexity/kimi-k3'),
+// POST /orchestrator/v1/messages
+PerplexityAIFactory::request('createOrchestratorMessage', [], [
+    'model' => PerplexityAIFactory::env('PERPLEXITY_ORCHESTRATOR_MODEL', 'perplexity/kimi-k3'),
     'max_tokens' => 256,
     'messages' => [['role' => 'user', 'content' => 'Explain PHP readonly classes.']],
 ]);

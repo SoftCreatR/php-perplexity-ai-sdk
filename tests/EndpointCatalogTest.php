@@ -25,6 +25,39 @@ use SoftCreatR\PerplexityAI\PerplexityAIURLBuilder;
 #[CoversNothing]
 final class EndpointCatalogTest extends TestCase
 {
+    public function testRemovedMethodsHaveNoCompatibilityAliases(): void
+    {
+        $endpoints = PerplexityAIURLBuilder::getEndpoints();
+
+        foreach ([
+            'createChatCompletion',
+            'createAsyncChatCompletion',
+            'listAsyncChatCompletions',
+            'retrieveAsyncChatCompletion',
+            'createRouterChatCompletion',
+            'createRouterMessage',
+            'createRouterResponse',
+            'listRouterModels',
+            'retrieveRouterModel',
+        ] as $method) {
+            $this->assertArrayNotHasKey($method, $endpoints);
+        }
+    }
+
+    public function testCatalogMatchesTheCurrentPublishedOpenApiRoutes(): void
+    {
+        $routes = [];
+
+        foreach (PerplexityAIURLBuilder::getEndpoints() as $endpoint) {
+            $routes[] = $endpoint['method'] . ' ' . ($endpoint['basePath'] ?? PerplexityAIURLBuilder::BASE_PATH) . $endpoint['path'];
+        }
+        \sort($routes);
+
+        $fixture = \file_get_contents(__DIR__ . '/fixtures/endpoints.json');
+        $this->assertIsString($fixture);
+        $this->assertSame(\json_decode($fixture, true, 512, JSON_THROW_ON_ERROR), $routes);
+    }
+
     public function testEveryRegisteredEndpointHasAMatchingExample(): void
     {
         $exampleRoot = \dirname(__DIR__) . '/examples';

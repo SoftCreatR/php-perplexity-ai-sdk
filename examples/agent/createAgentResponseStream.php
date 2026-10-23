@@ -23,13 +23,14 @@ PerplexityAIFactory::request(
     'createAgentResponse',
     [],
     [
-        'model' => 'openai/gpt-5-mini',
+        'model' => 'openai/gpt-6.1-sol',
+        'reasoning' => ['effort' => 'low'],
         'input' => 'List three PHP 8.5 features.',
-        'max_output_tokens' => 256,
+        'max_output_tokens' => 1024,
         'stream' => true,
     ],
     static function (mixed $event): void {
-        if (\is_array($event) && isset($event['delta']) && \is_string($event['delta'])) {
+        if (\is_array($event) && ($event['type'] ?? null) === 'response.output_text.delta' && \is_string($event['delta'] ?? null)) {
             echo $event['delta'];
         }
     },

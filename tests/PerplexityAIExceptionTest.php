@@ -20,14 +20,13 @@ namespace SoftCreatR\PerplexityAI\Tests;
 
 use Exception;
 use JsonException;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use SoftCreatR\PerplexityAI\Exception\PerplexityAIException;
 
 use const JSON_THROW_ON_ERROR;
 
-/**
- * @covers \SoftCreatR\PerplexityAI\Exception\PerplexityAIException
- */
+#[CoversClass(\SoftCreatR\PerplexityAI\Exception\PerplexityAIException::class)]
 final class PerplexityAIExceptionTest extends TestCase
 {
     /**

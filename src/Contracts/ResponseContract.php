@@ -16,7 +16,29 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-require_once \dirname(__DIR__, 2) . '/PerplexityAIFactory.php';
+namespace SoftCreatR\PerplexityAI\Contracts;
 
-// GET /router/v1/models
-PerplexityAIFactory::request('listRouterModels');
+use JsonSerializable;
+use Psr\Http\Message\ResponseInterface;
+
+/**
+ * Common access to an explicitly decoded JSON response and its HTTP metadata.
+ */
+interface ResponseContract extends JsonSerializable
+{
+    public function getResponse(): ResponseInterface;
+
+    public function getRawBody(): string;
+
+    public function getRequestId(): ?string;
+
+    /**
+     * @return array<array-key, mixed>
+     */
+    public function toArray(): array;
+
+    /**
+     * @return array<array-key, mixed>
+     */
+    public function jsonSerialize(): array;
+}

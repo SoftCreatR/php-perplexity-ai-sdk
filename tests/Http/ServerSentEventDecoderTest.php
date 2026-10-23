@@ -21,13 +21,13 @@ namespace SoftCreatR\PerplexityAI\Tests\Http;
 use GuzzleHttp\Psr7\FnStream;
 use GuzzleHttp\Psr7\Utils;
 use JsonException;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use SoftCreatR\PerplexityAI\Exception\PerplexityAIException;
 use SoftCreatR\PerplexityAI\Http\ServerSentEventDecoder;
 
-/**
- * @covers \SoftCreatR\PerplexityAI\Http\ServerSentEventDecoder
- */
+#[CoversClass(\SoftCreatR\PerplexityAI\Http\ServerSentEventDecoder::class)]
+#[CoversClass(PerplexityAIException::class)]
 final class ServerSentEventDecoderTest extends TestCase
 {
     /**

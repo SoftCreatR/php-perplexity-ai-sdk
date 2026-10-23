@@ -16,13 +16,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-require_once \dirname(__DIR__, 2) . '/PerplexityAIFactory.php';
+require_once \dirname(__DIR__) . '/PerplexityAIFactory.php';
 
-// POST /v1/async/sonar
-PerplexityAIFactory::request('createAsyncChatCompletion', [], [
-    'request' => [
-        'model' => 'sonar-deep-research',
-        'messages' => [['role' => 'user', 'content' => 'Compare the major additions in PHP 8.4 and PHP 8.5.']],
-        'max_tokens' => 8192,
-    ],
-]);
+// DELETE /v1/files/{file_id}
+PerplexityAIFactory::request('deleteFile', ['file_id' => PerplexityAIFactory::env('PERPLEXITY_FILE_ID')], []);

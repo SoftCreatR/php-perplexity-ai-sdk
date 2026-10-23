@@ -20,12 +20,13 @@ namespace SoftCreatR\PerplexityAI\Tests;
 
 use GuzzleHttp\Psr7\HttpFactory;
 use InvalidArgumentException;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use ReflectionException;
 use SoftCreatR\PerplexityAI\PerplexityAIURLBuilder;
 
-/** @covers \SoftCreatR\PerplexityAI\PerplexityAIURLBuilder */
+#[CoversClass(\SoftCreatR\PerplexityAI\PerplexityAIURLBuilder::class)]
 final class PerplexityAIURLBuilderTest extends TestCase
 {
     /** @throws ReflectionException */
@@ -42,12 +43,12 @@ final class PerplexityAIURLBuilderTest extends TestCase
     {
         $endpoints = PerplexityAIURLBuilder::getEndpoints();
 
-        $this->assertCount(22, $endpoints);
+        $this->assertCount(35, $endpoints);
         $this->assertSame(
-            ['method' => 'POST', 'path' => '/sonar', 'category' => 'sonar', 'body' => 'json'],
-            PerplexityAIURLBuilder::getEndpoint('createChatCompletion'),
+            ['method' => 'POST', 'path' => '/agent', 'category' => 'agent', 'body' => 'json'],
+            PerplexityAIURLBuilder::getEndpoint('createAgentResponse'),
         );
-        $this->assertSame('/router/v1/responses', $endpoints['createRouterResponse']['path']);
+        $this->assertSame('/orchestrator/v1/responses', $endpoints['createOrchestratorResponse']['path']);
         $this->assertSame('/v2', $endpoints['getComputerUsageAnalyticsV2']['basePath']);
         $this->assertSame('/analytics/computer/usage', $endpoints['getComputerUsageAnalyticsV2']['path']);
         $this->assertTrue($endpoints['getComputerUsageAnalyticsV2']['analytics']);
@@ -62,7 +63,7 @@ final class PerplexityAIURLBuilderTest extends TestCase
         $v2 = PerplexityAIURLBuilder::createUrl($factory, 'getComputerUsageAnalyticsV2');
         $custom = PerplexityAIURLBuilder::createUrl(
             $factory,
-            'retrieveRouterModel',
+            'retrieveOrchestratorModel',
             ['model' => 'openai/gpt 5'],
             'example.com',
             '/proxy/',
@@ -71,7 +72,7 @@ final class PerplexityAIURLBuilderTest extends TestCase
         $this->assertSame('https://api.perplexity.ai/v1/models', (string) $default);
         $this->assertSame('https://api.perplexity.ai/search', (string) $root);
         $this->assertSame('https://api.perplexity.ai/v2/analytics/computer/usage', (string) $v2);
-        $this->assertSame('https://example.com/proxy/router/v1/models/openai%2Fgpt%205', (string) $custom);
+        $this->assertSame('https://example.com/proxy/orchestrator/v1/models/openai%2Fgpt%205', (string) $custom);
     }
 
     public function testCreatesUrlsFromAbsoluteOrigins(): void
@@ -97,7 +98,7 @@ final class PerplexityAIURLBuilderTest extends TestCase
     public function testRejectsUnknownEndpoint(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Invalid PerplexityAI URL key "unknown".');
+        $this->expectExceptionMessageMatches('/' . \preg_quote('Invalid PerplexityAI URL key "unknown".', '/') . '/');
 
         PerplexityAIURLBuilder::getEndpoint('unknown');
     }
@@ -105,16 +106,16 @@ final class PerplexityAIURLBuilderTest extends TestCase
     public function testRejectsMissingPathParameter(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Missing path parameter "model".');
+        $this->expectExceptionMessageMatches('/' . \preg_quote('Missing path parameter "model".', '/') . '/');
 
-        PerplexityAIURLBuilder::createUrl(new HttpFactory(), 'retrieveRouterModel');
+        PerplexityAIURLBuilder::createUrl(new HttpFactory(), 'retrieveOrchestratorModel');
     }
 
     public function testRejectsNonScalarPathParameter(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Parameter "model" must be a scalar value, array given.');
+        $this->expectExceptionMessageMatches('/' . \preg_quote('Parameter "model" must be a scalar value, array given.', '/') . '/');
 
-        PerplexityAIURLBuilder::createUrl(new HttpFactory(), 'retrieveRouterModel', ['model' => []]);
+        PerplexityAIURLBuilder::createUrl(new HttpFactory(), 'retrieveOrchestratorModel', ['model' => []]);
     }
 }

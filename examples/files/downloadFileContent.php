@@ -18,8 +18,5 @@
 
 require_once \dirname(__DIR__) . '/PerplexityAIFactory.php';
 
-// POST /v1/sonar
-PerplexityAIFactory::request('createChatCompletion', [], [
-    'model' => 'sonar',
-    'messages' => [['role' => 'user', 'content' => 'What is the capital of France?']],
-]);
+// GET /v1/files/{file_id}/content
+PerplexityAIFactory::request('downloadFileContent', ['file_id' => PerplexityAIFactory::env('PERPLEXITY_FILE_ID')], []);

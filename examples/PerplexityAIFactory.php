@@ -67,7 +67,7 @@ final class PerplexityAIFactory
     /**
      * Send a generic request to a Perplexity endpoint.
      *
-     * @param string        $method          Method name, e.g. 'createChatCompletion'.
+     * @param string        $method          Method name, e.g. 'createAgentResponse'.
      * @param array         $parameters      URL/path parameters.
      * @param array         $options         Body or query parameters.
      * @param callable|null $streamCallback  Stream callback for SSE.
@@ -89,10 +89,6 @@ final class PerplexityAIFactory
             $useAnalyticsKey = $useAnalyticsKey || ($endpoint['analytics'] ?? false);
             $keyName = $useAnalyticsKey ? 'PERPLEXITY_ANALYTICS_API_KEY' : 'PERPLEXITY_API_KEY';
             $apiKey = self::value($keyName);
-
-            if (!$useAnalyticsKey && $apiKey === '') {
-                $apiKey = self::value('PERPLEXITYAI_API_KEY');
-            }
 
             if ($apiKey === '') {
                 throw new RuntimeException("Set {$keyName} in the project .env file before running this example.");

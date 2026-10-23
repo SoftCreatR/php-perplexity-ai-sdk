@@ -1,0 +1,34 @@
+{
+    "id": "resp_example",
+    "object": "response",
+    "model": "openai/gpt-6.1-sol",
+    "status": "completed",
+    "output": [
+        {
+            "type": "reasoning",
+            "summary": []
+        },
+        {
+            "type": "message",
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "output_text",
+                    "text": "{\"summary\":\"The customer reports a damaged item.\",\"sentiment\":\"negative\"}"
+                }
+            ]
+        },
+        {
+            "type": "future_output_type",
+            "data": {
+                "enabled": true
+            }
+        }
+    ],
+    "usage": {
+        "input_tokens": 20,
+        "output_tokens": 16,
+        "total_tokens": 36
+    },
+    "future_field": true
+}

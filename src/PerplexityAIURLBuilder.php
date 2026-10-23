@@ -32,6 +32,10 @@ class PerplexityAIURLBuilder
 
     private const HTTP_METHOD_GET = 'GET';
 
+    private const HTTP_METHOD_PUT = 'PUT';
+
+    private const HTTP_METHOD_DELETE = 'DELETE';
+
     /**
      * Configuration of Perplexity API endpoints.
      *
@@ -39,7 +43,8 @@ class PerplexityAIURLBuilder
      *     method: string,
      *     path: string,
      *     category: string,
-     *     body: 'none'|'json',
+     *     body: 'none'|'json'|'multipart',
+     *     fileFields?: list<string>,
      *     basePath?: string,
      *     headers?: array<string, string|string[]>,
      *     query?: array<string, bool|float|int|string>,
@@ -55,24 +60,37 @@ class PerplexityAIURLBuilder
         'downloadAgentResponseFile' => ['method' => self::HTTP_METHOD_GET, 'path' => '/agent/{id}/files/{file_id}/content', 'category' => 'agent', 'body' => 'none'],
         'cancelAgentResponse' => ['method' => self::HTTP_METHOD_POST, 'path' => '/agent/{id}/cancel', 'category' => 'agent', 'body' => 'none'],
 
-        // Sonar API
-        'createChatCompletion' => ['method' => self::HTTP_METHOD_POST, 'path' => '/sonar', 'category' => 'sonar', 'body' => 'json'],
-        'createAsyncChatCompletion' => ['method' => self::HTTP_METHOD_POST, 'path' => '/async/sonar', 'category' => 'sonar/async', 'body' => 'json'],
-        'listAsyncChatCompletions' => ['method' => self::HTTP_METHOD_GET, 'path' => '/async/sonar', 'category' => 'sonar/async', 'body' => 'none'],
-        'retrieveAsyncChatCompletion' => ['method' => self::HTTP_METHOD_GET, 'path' => '/async/sonar/{api_request}', 'category' => 'sonar/async', 'body' => 'none'],
-
         // Search, embeddings, and models
         'search' => ['method' => self::HTTP_METHOD_POST, 'path' => '/search', 'category' => 'search', 'body' => 'json', 'basePath' => ''],
         'createEmbedding' => ['method' => self::HTTP_METHOD_POST, 'path' => '/embeddings', 'category' => 'embeddings', 'body' => 'json'],
         'createContextualizedEmbedding' => ['method' => self::HTTP_METHOD_POST, 'path' => '/contextualizedembeddings', 'category' => 'embeddings', 'body' => 'json'],
         'listModels' => ['method' => self::HTTP_METHOD_GET, 'path' => '/models', 'category' => 'models', 'body' => 'none'],
 
-        // Router API
-        'createRouterChatCompletion' => ['method' => self::HTTP_METHOD_POST, 'path' => '/router/v1/chat/completions', 'category' => 'router/chat', 'body' => 'json', 'basePath' => ''],
-        'createRouterMessage' => ['method' => self::HTTP_METHOD_POST, 'path' => '/router/v1/messages', 'category' => 'router/messages', 'body' => 'json', 'basePath' => ''],
-        'createRouterResponse' => ['method' => self::HTTP_METHOD_POST, 'path' => '/router/v1/responses', 'category' => 'router/responses', 'body' => 'json', 'basePath' => ''],
-        'listRouterModels' => ['method' => self::HTTP_METHOD_GET, 'path' => '/router/v1/models', 'category' => 'router/models', 'body' => 'none', 'basePath' => ''],
-        'retrieveRouterModel' => ['method' => self::HTTP_METHOD_GET, 'path' => '/router/v1/models/{model}', 'category' => 'router/models', 'body' => 'none', 'basePath' => ''],
+        // Orchestrator API
+        'createOrchestratorChatCompletion' => ['method' => self::HTTP_METHOD_POST, 'path' => '/orchestrator/v1/chat/completions', 'category' => 'orchestrator/chat', 'body' => 'json', 'basePath' => ''],
+        'createOrchestratorMessage' => ['method' => self::HTTP_METHOD_POST, 'path' => '/orchestrator/v1/messages', 'category' => 'orchestrator/messages', 'body' => 'json', 'basePath' => ''],
+        'createOrchestratorResponse' => ['method' => self::HTTP_METHOD_POST, 'path' => '/orchestrator/v1/responses', 'category' => 'orchestrator/responses', 'body' => 'json', 'basePath' => ''],
+        'listOrchestratorModels' => ['method' => self::HTTP_METHOD_GET, 'path' => '/orchestrator/v1/models', 'category' => 'orchestrator/models', 'body' => 'none', 'basePath' => ''],
+        'retrieveOrchestratorModel' => ['method' => self::HTTP_METHOD_GET, 'path' => '/orchestrator/v1/models/{model}', 'category' => 'orchestrator/models', 'body' => 'none', 'basePath' => ''],
+
+        // Decisions, Skills, Files, and Batches
+        'createDecision' => ['method' => self::HTTP_METHOD_POST, 'path' => '/decisions', 'category' => 'decisions', 'body' => 'json'],
+        'createSkill' => ['method' => self::HTTP_METHOD_POST, 'path' => '/skills', 'category' => 'skills', 'body' => 'multipart', 'fileFields' => ['file']],
+        'listSkills' => ['method' => self::HTTP_METHOD_GET, 'path' => '/skills', 'category' => 'skills', 'body' => 'none'],
+        'retrieveSkill' => ['method' => self::HTTP_METHOD_GET, 'path' => '/skills/{skill_id}', 'category' => 'skills', 'body' => 'none'],
+        'updateSkill' => ['method' => self::HTTP_METHOD_PUT, 'path' => '/skills/{skill_id}', 'category' => 'skills', 'body' => 'multipart', 'fileFields' => ['file']],
+        'listSkillRevisions' => ['method' => self::HTTP_METHOD_GET, 'path' => '/skills/{skill_id}/revisions', 'category' => 'skills', 'body' => 'none'],
+        'downloadSkill' => ['method' => self::HTTP_METHOD_GET, 'path' => '/skills/{skill_id}/download', 'category' => 'skills', 'body' => 'none'],
+        'deleteSkill' => ['method' => self::HTTP_METHOD_DELETE, 'path' => '/skills/{skill_id}', 'category' => 'skills', 'body' => 'none'],
+        'uploadFile' => ['method' => self::HTTP_METHOD_POST, 'path' => '/files', 'category' => 'files', 'body' => 'multipart', 'fileFields' => ['file']],
+        'listFiles' => ['method' => self::HTTP_METHOD_GET, 'path' => '/files', 'category' => 'files', 'body' => 'none'],
+        'retrieveFile' => ['method' => self::HTTP_METHOD_GET, 'path' => '/files/{file_id}', 'category' => 'files', 'body' => 'none'],
+        'downloadFileContent' => ['method' => self::HTTP_METHOD_GET, 'path' => '/files/{file_id}/content', 'category' => 'files', 'body' => 'none'],
+        'deleteFile' => ['method' => self::HTTP_METHOD_DELETE, 'path' => '/files/{file_id}', 'category' => 'files', 'body' => 'none'],
+        'createBatch' => ['method' => self::HTTP_METHOD_POST, 'path' => '/batches', 'category' => 'batches', 'body' => 'json'],
+        'listBatches' => ['method' => self::HTTP_METHOD_GET, 'path' => '/batches', 'category' => 'batches', 'body' => 'none'],
+        'retrieveBatch' => ['method' => self::HTTP_METHOD_GET, 'path' => '/batches/{batch_id}', 'category' => 'batches', 'body' => 'none'],
+        'cancelBatch' => ['method' => self::HTTP_METHOD_POST, 'path' => '/batches/{batch_id}/cancel', 'category' => 'batches', 'body' => 'none'],
 
         // Authentication
         'generateAuthToken' => ['method' => self::HTTP_METHOD_POST, 'path' => '/generate_auth_token', 'category' => 'authentication', 'body' => 'json', 'basePath' => ''],
@@ -98,7 +116,8 @@ class PerplexityAIURLBuilder
      *     method: string,
      *     path: string,
      *     category: string,
-     *     body: 'none'|'json',
+     *     body: 'none'|'json'|'multipart',
+     *     fileFields?: list<string>,
      *     basePath?: string,
      *     headers?: array<string, string|string[]>,
      *     query?: array<string, bool|float|int|string>,
@@ -120,7 +139,8 @@ class PerplexityAIURLBuilder
      *     method: string,
      *     path: string,
      *     category: string,
-     *     body: 'none'|'json',
+     *     body: 'none'|'json'|'multipart',
+     *     fileFields?: list<string>,
      *     basePath?: string,
      *     headers?: array<string, string|string[]>,
      *     query?: array<string, bool|float|int|string>,

@@ -22,6 +22,7 @@ use Exception;
 use GuzzleHttp\Psr7\HttpFactory;
 use GuzzleHttp\Psr7\Response;
 use InvalidArgumentException;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
@@ -35,12 +36,11 @@ use SoftCreatR\PerplexityAI\Http\StreamingClientInterface;
 use SoftCreatR\PerplexityAI\PerplexityAI;
 use Throwable;
 
-/**
- * @covers \SoftCreatR\PerplexityAI\Exception\PerplexityAIException
- * @covers \SoftCreatR\PerplexityAI\Http\ServerSentEventDecoder
- * @covers \SoftCreatR\PerplexityAI\PerplexityAI
- * @covers \SoftCreatR\PerplexityAI\PerplexityAIURLBuilder
- */
+#[CoversClass(\SoftCreatR\PerplexityAI\PerplexityAI::class)]
+#[CoversClass(\SoftCreatR\PerplexityAI\PerplexityAIURLBuilder::class)]
+#[CoversClass(\SoftCreatR\PerplexityAI\Exception\PerplexityAIException::class)]
+#[CoversClass(\SoftCreatR\PerplexityAI\Http\ServerSentEventDecoder::class)]
+#[CoversClass(\SoftCreatR\PerplexityAI\Http\MultipartBodyBuilder::class)]
 final class PerplexityAITest extends TestCase
 {
     private PerplexityAI $perplexityAI;
@@ -68,21 +68,24 @@ final class PerplexityAITest extends TestCase
     {
         $this->mockRequest(function (RequestInterface $request): Response {
             $this->assertSame('POST', $request->getMethod());
-            $this->assertSame('https://example.com/api/sonar', (string) $request->getUri());
+            $this->assertSame('https://example.com/api/agent', (string) $request->getUri());
             $this->assertSame('Bearer pplx-test', $request->getHeaderLine('Authorization'));
             $this->assertSame('application/json', $request->getHeaderLine('Content-Type'));
-            $this->assertSame('{"model":"sonar","messages":[]}', (string) $request->getBody());
+            $this->assertSame(
+                ['model' => 'openai/gpt-6-luna', 'input' => 'test'],
+                \json_decode((string) $request->getBody(), true, 512, JSON_THROW_ON_ERROR),
+            );
 
             return new Response(200, [], '{"ok":true}');
         });
 
-        $response = $this->perplexityAI->createChatCompletion(['model' => 'sonar', 'messages' => []]);
+        $response = $this->perplexityAI->createAgentResponse(['model' => 'openai/gpt-6-luna', 'input' => 'test']);
 
         $this->assertSame('{"ok":true}', (string) $response->getBody());
     }
 
     /** @throws Throwable */
-    public function testLegacyTwoArrayCallKeepsParametersSeparateFromBody(): void
+    public function testExplicitParameterAndBodyArraysRemainSeparate(): void
     {
         $this->mockRequest(function (RequestInterface $request): Response {
             $this->assertSame('https://example.com/api/agent?id=unused&include=usage', (string) $request->getUri());
@@ -157,7 +160,7 @@ final class PerplexityAITest extends TestCase
     }
 
     /** @throws Throwable */
-    public function testCustomHeadersCanBePassedInEitherLegacyArray(): void
+    public function testCustomHeadersCanBePassedInEitherArray(): void
     {
         $requests = [];
         $this->mockRequest(static function (RequestInterface $request) use (&$requests): Response {
@@ -183,14 +186,42 @@ final class PerplexityAITest extends TestCase
     }
 
     /** @throws Throwable */
+    public function testMultipartUploadsUseRawBytesAndKeepRevisionInTheQuery(): void
+    {
+        $requests = [];
+        $this->mockRequest(static function (RequestInterface $request) use (&$requests): Response {
+            $requests[] = $request;
+
+            return new Response(201);
+        });
+
+        $this->perplexityAI->uploadFile([
+            'purpose' => 'batch',
+            'file' => \dirname(__DIR__) . '/examples/files/fixtures/batch.jsonl',
+        ]);
+        $this->perplexityAI->updateSkill(
+            ['skill_id' => 'skill/1', 'expected_revision' => 'revision 1'],
+            ['file' => \dirname(__DIR__) . '/examples/skills/fixtures/skills.zip'],
+        );
+
+        $this->assertStringStartsWith('multipart/form-data; boundary=----PerplexityAI', $requests[0]->getHeaderLine('Content-Type'));
+        $this->assertStringContainsString('name="purpose"', (string) $requests[0]->getBody());
+        $this->assertStringContainsString('php-sdk-example-1', (string) $requests[0]->getBody());
+        $this->assertSame('PUT', $requests[1]->getMethod());
+        $this->assertSame('https://example.com/api/skills/skill%2F1?expected_revision=revision%201', (string) $requests[1]->getUri());
+        $this->assertStringContainsString('filename="skills.zip"', (string) $requests[1]->getBody());
+        $this->assertStringNotContainsString('expected_revision', (string) $requests[1]->getBody());
+    }
+
+    /** @throws Throwable */
     public function testStreamingDecodesEventsAndReturnsResponse(): void
     {
         $response = new Response(200, ['Content-Type' => 'text/event-stream'], "data: {\"delta\":\"a\"}\n\ndata: [DONE]\n\n");
         $this->mockRequest(static fn(): Response => $response);
         $events = [];
 
-        $actual = $this->perplexityAI->createChatCompletion(
-            ['model' => 'sonar', 'messages' => [], 'stream' => true],
+        $actual = $this->perplexityAI->createAgentResponse(
+            ['model' => 'openai/gpt-6-luna', 'input' => 'test', 'stream' => true],
             static function (mixed $event) use (&$events): void {
                 $events[] = $event;
             },
@@ -211,7 +242,7 @@ final class PerplexityAITest extends TestCase
         $events = [];
 
         $this->perplexityAI->createAgentResponse(
-            ['model' => 'openai/gpt-5-mini', 'input' => 'test'],
+            ['model' => 'openai/gpt-6-luna', 'input' => 'test'],
             static function (mixed $event) use (&$events): void {
                 $events[] = $event;
             },
@@ -246,8 +277,8 @@ final class PerplexityAITest extends TestCase
         ));
         $sdk = new PerplexityAI($factory, $factory, $factory, $client, 'key');
 
-        $sdk->createRouterResponse(
-            ['model' => 'openai/gpt-5-mini', 'input' => 'test', 'stream' => true],
+        $sdk->createOrchestratorResponse(
+            ['model' => 'openai/gpt-6-luna', 'input' => 'test', 'stream' => true],
             static function (): void {},
         );
     }
@@ -343,7 +374,7 @@ final class PerplexityAITest extends TestCase
     }
 
     /** @throws ReflectionException */
-    public function testPrivateArgumentNormalizerCompatibilityBranch(): void
+    public function testNormalizesExplicitParametersAndBodyFirstPathParameters(): void
     {
         $method = TestHelper::getPrivateMethod($this->perplexityAI, 'extractCallArguments');
         $callback = static function (): void {};
@@ -353,6 +384,7 @@ final class PerplexityAITest extends TestCase
             $method->invoke(
                 $this->perplexityAI,
                 [['a' => 1, 'customHeaders' => ['X-Test' => 'first']], ['b' => 2, 'customHeaders' => ['X-Test' => 'second']], $callback],
+                ['method' => 'POST', 'path' => '/responses', 'body' => 'json'],
             ),
         );
         $this->assertSame(
@@ -365,19 +397,6 @@ final class PerplexityAITest extends TestCase
         );
     }
 
-    /** @throws ReflectionException */
-    public function testPrivateBodyAndHeaderCompatibilityBranches(): void
-    {
-        $inferBodyType = TestHelper::getPrivateMethod($this->perplexityAI, 'inferBodyType');
-        $createHeaders = TestHelper::getPrivateMethod($this->perplexityAI, 'createHeaders');
-
-        $this->assertSame('none', $inferBodyType->invoke($this->perplexityAI, 'GET', '/resource'));
-        $this->assertSame('none', $inferBodyType->invoke($this->perplexityAI, 'DELETE', '/resource'));
-        $this->assertSame('json', $inferBodyType->invoke($this->perplexityAI, 'POST', '/resource'));
-        $this->assertSame('application/json', $createHeaders->invoke($this->perplexityAI, true)['Content-Type']);
-        $this->assertArrayNotHasKey('Content-Type', $createHeaders->invoke($this->perplexityAI, false));
-    }
-
     /**
      * @param array<int, mixed> $arguments
      *
@@ -387,9 +406,9 @@ final class PerplexityAITest extends TestCase
     public function testRejectsInvalidMagicCallArguments(array $arguments, string $message): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage($message);
+        $this->expectExceptionMessageMatches('/' . \preg_quote($message, '/') . '/');
 
-        $this->perplexityAI->__call('createChatCompletion', $arguments);
+        $this->perplexityAI->__call('createAgentResponse', $arguments);
     }
 
     /** @return iterable<string, array{array<int,mixed>,string}> */
