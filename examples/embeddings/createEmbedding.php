@@ -20,6 +20,7 @@ require_once \dirname(__DIR__) . '/PerplexityAIFactory.php';
 
 // POST /v1/embeddings
 PerplexityAIFactory::request('createEmbedding', [], [
-    'model' => 'pplx-embed-v1-0.6b',
-    'input' => ['PHP is a general-purpose scripting language.'],
+    'model' => 'pplx-embed-v2-context-0.6b',
+    'input_type' => 'query',
+    'input' => ['What is PHP used for?'],
 ]);

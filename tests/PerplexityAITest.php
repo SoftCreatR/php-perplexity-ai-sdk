@@ -137,6 +137,42 @@ final class PerplexityAITest extends TestCase
     }
 
     /** @throws Throwable */
+    public function testMonitorUpdateSeparatesPathFromPatchBody(): void
+    {
+        $this->mockRequest(function (RequestInterface $request): Response {
+            $this->assertSame('PATCH', $request->getMethod());
+            $this->assertSame('https://example.com/api/monitors/mon_1', (string) $request->getUri());
+            $this->assertSame('application/json', $request->getHeaderLine('Content-Type'));
+            $this->assertSame('{"name":"Updated monitor","webhook":null}', (string) $request->getBody());
+
+            return new Response();
+        });
+
+        $this->perplexityAI->updateMonitor([
+            'monitor_id' => 'mon_1',
+            'name' => 'Updated monitor',
+            'webhook' => null,
+        ]);
+    }
+
+    /** @throws Throwable */
+    public function testManualMonitorRunSendsNoBody(): void
+    {
+        $this->mockRequest(function (RequestInterface $request): Response {
+            $this->assertSame('POST', $request->getMethod());
+            $this->assertSame('https://example.com/api/monitors/mon_1/run', (string) $request->getUri());
+            $this->assertSame('', (string) $request->getBody());
+            $this->assertFalse($request->hasHeader('Content-Type'));
+
+            return new Response(202);
+        });
+
+        $response = $this->perplexityAI->runMonitor(['monitor_id' => 'mon_1']);
+
+        $this->assertSame(202, $response->getStatusCode());
+    }
+
+    /** @throws Throwable */
     public function testRequestMethodSupportsQueryBodyAndCustomHeaders(): void
     {
         $this->mockRequest(function (RequestInterface $request): Response {

@@ -86,8 +86,11 @@ final class PerplexityAIFactory
     ): ?string {
         try {
             $endpoint = PerplexityAIURLBuilder::getEndpoint($method);
-            $useAnalyticsKey = $useAnalyticsKey || ($endpoint['analytics'] ?? false);
-            $keyName = $useAnalyticsKey ? 'PERPLEXITY_ANALYTICS_API_KEY' : 'PERPLEXITY_API_KEY';
+            $keyName = match (true) {
+                $endpoint['audit'] ?? false => 'PERPLEXITY_AUDIT_API_KEY',
+                $useAnalyticsKey || ($endpoint['analytics'] ?? false) => 'PERPLEXITY_ANALYTICS_API_KEY',
+                default => 'PERPLEXITY_API_KEY',
+            };
             $apiKey = self::value($keyName);
 
             if ($apiKey === '') {

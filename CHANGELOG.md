@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 4.1.0 - 2026-11-19
+
+### Added
+
+- Added the Monitor API for scheduling, updating, running, and inspecting monitors and testing webhook delivery.
+- Added URL fetching through the Context API and audit-event listing with a separate Enterprise audit key.
+- Added grouped examples, v2 embedding query and document examples, and Decisions span-location and web-grounding examples.
+
+### Changed
+
+- Documented the omitted Credit Source analytics breakdown and how to read the returned categories.
+- Updated Orchestrator setup to reflect access by organization usage tier rather than limited preview.
+
 ## 4.0.0 - 2026-10-23
 
 ### Added

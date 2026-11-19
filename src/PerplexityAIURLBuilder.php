@@ -36,6 +36,8 @@ class PerplexityAIURLBuilder
 
     private const HTTP_METHOD_DELETE = 'DELETE';
 
+    private const HTTP_METHOD_PATCH = 'PATCH';
+
     /**
      * Configuration of Perplexity API endpoints.
      *
@@ -49,7 +51,8 @@ class PerplexityAIURLBuilder
      *     headers?: array<string, string|string[]>,
      *     query?: array<string, bool|float|int|string>,
      *     streaming?: bool,
-     *     analytics?: bool
+     *     analytics?: bool,
+     *     audit?: bool
      * }>
      */
     private static array $urlEndpoints = [
@@ -65,6 +68,20 @@ class PerplexityAIURLBuilder
         'createEmbedding' => ['method' => self::HTTP_METHOD_POST, 'path' => '/embeddings', 'category' => 'embeddings', 'body' => 'json'],
         'createContextualizedEmbedding' => ['method' => self::HTTP_METHOD_POST, 'path' => '/contextualizedembeddings', 'category' => 'embeddings', 'body' => 'json'],
         'listModels' => ['method' => self::HTTP_METHOD_GET, 'path' => '/models', 'category' => 'models', 'body' => 'none'],
+
+        // Monitor and Context APIs
+        'createMonitor' => ['method' => self::HTTP_METHOD_POST, 'path' => '/monitors', 'category' => 'monitors', 'body' => 'json'],
+        'listMonitors' => ['method' => self::HTTP_METHOD_GET, 'path' => '/monitors', 'category' => 'monitors', 'body' => 'none'],
+        'retrieveMonitor' => ['method' => self::HTTP_METHOD_GET, 'path' => '/monitors/{monitor_id}', 'category' => 'monitors', 'body' => 'none'],
+        'updateMonitor' => ['method' => self::HTTP_METHOD_PATCH, 'path' => '/monitors/{monitor_id}', 'category' => 'monitors', 'body' => 'json'],
+        'deleteMonitor' => ['method' => self::HTTP_METHOD_DELETE, 'path' => '/monitors/{monitor_id}', 'category' => 'monitors', 'body' => 'none'],
+        'pauseMonitor' => ['method' => self::HTTP_METHOD_POST, 'path' => '/monitors/{monitor_id}/pause', 'category' => 'monitors', 'body' => 'none'],
+        'resumeMonitor' => ['method' => self::HTTP_METHOD_POST, 'path' => '/monitors/{monitor_id}/resume', 'category' => 'monitors', 'body' => 'none'],
+        'runMonitor' => ['method' => self::HTTP_METHOD_POST, 'path' => '/monitors/{monitor_id}/run', 'category' => 'monitors', 'body' => 'none'],
+        'testMonitorWebhook' => ['method' => self::HTTP_METHOD_POST, 'path' => '/monitors/{monitor_id}/webhook/test', 'category' => 'monitors', 'body' => 'none'],
+        'listMonitorRuns' => ['method' => self::HTTP_METHOD_GET, 'path' => '/monitors/{monitor_id}/runs', 'category' => 'monitors', 'body' => 'none'],
+        'retrieveMonitorRun' => ['method' => self::HTTP_METHOD_GET, 'path' => '/monitors/{monitor_id}/runs/{run_id}', 'category' => 'monitors', 'body' => 'none'],
+        'fetchContext' => ['method' => self::HTTP_METHOD_POST, 'path' => '/context', 'category' => 'context', 'body' => 'json'],
 
         // Orchestrator API
         'createOrchestratorChatCompletion' => ['method' => self::HTTP_METHOD_POST, 'path' => '/orchestrator/v1/chat/completions', 'category' => 'orchestrator/chat', 'body' => 'json', 'basePath' => ''],
@@ -96,6 +113,9 @@ class PerplexityAIURLBuilder
         'generateAuthToken' => ['method' => self::HTTP_METHOD_POST, 'path' => '/generate_auth_token', 'category' => 'authentication', 'body' => 'json', 'basePath' => ''],
         'revokeAuthToken' => ['method' => self::HTTP_METHOD_POST, 'path' => '/revoke_auth_token', 'category' => 'authentication', 'body' => 'json', 'basePath' => ''],
 
+        // Audit API
+        'listAuditEvents' => ['method' => self::HTTP_METHOD_GET, 'path' => '/admin/audit-events', 'category' => 'administration/audit', 'body' => 'none', 'audit' => true],
+
         // Analytics
         'getComputerUsageAnalytics' => ['method' => self::HTTP_METHOD_GET, 'path' => '/analytics/computer/usage', 'category' => 'analytics', 'body' => 'none', 'analytics' => true],
         'getComputerUsageAnalyticsV2' => ['method' => self::HTTP_METHOD_GET, 'path' => '/analytics/computer/usage', 'category' => 'analytics', 'body' => 'none', 'basePath' => '/v2', 'analytics' => true],
@@ -122,7 +142,8 @@ class PerplexityAIURLBuilder
      *     headers?: array<string, string|string[]>,
      *     query?: array<string, bool|float|int|string>,
      *     streaming?: bool,
-     *     analytics?: bool
+     *     analytics?: bool,
+     *     audit?: bool
      * }>
      */
     public static function getEndpoints(): array
@@ -145,7 +166,8 @@ class PerplexityAIURLBuilder
      *     headers?: array<string, string|string[]>,
      *     query?: array<string, bool|float|int|string>,
      *     streaming?: bool,
-     *     analytics?: bool
+     *     analytics?: bool,
+     *     audit?: bool
      * } The endpoint configuration.
      *
      * @throws InvalidArgumentException If the provided key is invalid.

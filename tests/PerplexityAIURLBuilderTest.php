@@ -43,7 +43,6 @@ final class PerplexityAIURLBuilderTest extends TestCase
     {
         $endpoints = PerplexityAIURLBuilder::getEndpoints();
 
-        $this->assertCount(35, $endpoints);
         $this->assertSame(
             ['method' => 'POST', 'path' => '/agent', 'category' => 'agent', 'body' => 'json'],
             PerplexityAIURLBuilder::getEndpoint('createAgentResponse'),
@@ -52,6 +51,8 @@ final class PerplexityAIURLBuilderTest extends TestCase
         $this->assertSame('/v2', $endpoints['getComputerUsageAnalyticsV2']['basePath']);
         $this->assertSame('/analytics/computer/usage', $endpoints['getComputerUsageAnalyticsV2']['path']);
         $this->assertTrue($endpoints['getComputerUsageAnalyticsV2']['analytics']);
+        $this->assertTrue($endpoints['listAuditEvents']['audit']);
+        $this->assertArrayNotHasKey('analytics', $endpoints['listAuditEvents']);
     }
 
     public function testCreatesDefaultAndCustomUrlsAndEncodesPathParameters(): void

@@ -267,16 +267,25 @@ admin can generate this separate key in **Settings > Organization > Computer > A
 and selecting **Generate key**. It is not a regular project API key. If the toggle is missing, contact your Perplexity
 representative. See the [Analytics API setup guide](https://docs.perplexity.ai/docs/admin/computer-analytics-api#getting-access).
 Only one analytics key can be active per organization; regenerating it revokes the previous key.
+For `credit_usage`, read the returned `categories` rather than assuming a fixed set of breakdowns. An omitted
+`Credit Source` breakdown does not mean zero usage.
+
+Set `PERPLEXITY_AUDIT_API_KEY` for the [audit example](examples/administration/audit/listAuditEvents.php).
+An Enterprise organization admin generates this read-only key under **Enterprise APIs > Audit API**.
+It is separate from the project and analytics keys. See the [Audit API setup guide](https://docs.perplexity.ai/docs/admin/audit-api).
 
 Resource examples use
 `PERPLEXITY_AGENT_RESPONSE_ID`, `PERPLEXITY_AGENT_FILE_ID`, `PERPLEXITY_SKILL_ID`, `PERPLEXITY_SKILL_REVISION`,
-`PERPLEXITY_FILE_ID`, and `PERPLEXITY_BATCH_ID`. The optional mapper example uses a local fixture and does not
-make an API call. Review upload, cancellation, deletion, and authentication examples before running them.
+`PERPLEXITY_FILE_ID`, `PERPLEXITY_BATCH_ID`, `PERPLEXITY_MONITOR_ID`, and `PERPLEXITY_MONITOR_RUN_ID`.
+The optional mapper example uses a local fixture and does not make an API call. Review upload, cancellation,
+deletion, and authentication examples before running them. New monitors are active and will run on their schedule;
+delete temporary monitors when finished. Test webhook delivery only against an endpoint you control.
 
 Use Agent effort levels such as `fast` instead of retired Sonar models, or select a provider-prefixed `model`.
-Direct model requests do not enable web search by default; add the desired tools explicitly. Orchestrator access
-is currently limited preview and requires approval. Requests use the documented `/orchestrator/v1` routes through
-the `*Orchestrator*` methods and the examples under `examples/orchestrator`.
+Direct model requests do not enable web search by default; add the desired tools explicitly. Orchestrator uses the
+regular Perplexity API key, and available models depend on your organization's
+[usage tier](https://docs.perplexity.ai/docs/orchestrator/faq#access-and-setup). Its examples use the documented
+`/orchestrator/v1` routes through the `*Orchestrator*` methods.
 
 ## Supported Methods
 
@@ -299,7 +308,35 @@ The retired Sonar and asynchronous Sonar endpoints are intentionally absent.
 |------------|----------------|--------------|-----------------------------------|
 | `search`   | `POST /search` | `json`       | [PHP](examples/search/search.php) |
 
+### Monitors
+
+| SDK method | HTTP route | Request body | Example |
+| --- | --- | --- | --- |
+| `createMonitor` | `POST /v1/monitors` | `json` | [PHP](examples/monitors/createMonitor.php) |
+| `listMonitors` | `GET /v1/monitors` | `none` | [PHP](examples/monitors/listMonitors.php) |
+| `retrieveMonitor` | `GET /v1/monitors/{monitor_id}` | `none` | [PHP](examples/monitors/retrieveMonitor.php) |
+| `updateMonitor` | `PATCH /v1/monitors/{monitor_id}` | `json` | [PHP](examples/monitors/updateMonitor.php) |
+| `deleteMonitor` | `DELETE /v1/monitors/{monitor_id}` | `none` | [PHP](examples/monitors/deleteMonitor.php) |
+| `pauseMonitor` | `POST /v1/monitors/{monitor_id}/pause` | `none` | [PHP](examples/monitors/pauseMonitor.php) |
+| `resumeMonitor` | `POST /v1/monitors/{monitor_id}/resume` | `none` | [PHP](examples/monitors/resumeMonitor.php) |
+| `runMonitor` | `POST /v1/monitors/{monitor_id}/run` | `none` | [PHP](examples/monitors/runMonitor.php) |
+| `testMonitorWebhook` | `POST /v1/monitors/{monitor_id}/webhook/test` | `none` | [PHP](examples/monitors/testMonitorWebhook.php) |
+| `listMonitorRuns` | `GET /v1/monitors/{monitor_id}/runs` | `none` | [PHP](examples/monitors/listMonitorRuns.php) |
+| `retrieveMonitorRun` | `GET /v1/monitors/{monitor_id}/runs/{run_id}` | `none` | [PHP](examples/monitors/retrieveMonitorRun.php) |
+
+### Context
+
+| SDK method | HTTP route | Request body | Example |
+| --- | --- | --- | --- |
+| `fetchContext` | `POST /v1/context` | `json` | [PHP](examples/context/fetchContext.php) |
+
 ### Embeddings
+
+The v2 embedding models use `createEmbedding()` for both queries and indexed content. Set
+`input_type` to `query` or `document`; v2 requires it. See the
+[chunked document example](examples/embeddings/createEmbeddingFromDocumentChunks.php) and
+[v2 embedding guide](https://docs.perplexity.ai/docs/embeddings/contextualized-embeddings#v2-models)
+for document and image inputs.
 
 | SDK method                      | HTTP route                          | Request body | Example                                                      |
 |---------------------------------|-------------------------------------|--------------|--------------------------------------------------------------|
@@ -355,6 +392,10 @@ The retired Sonar and asynchronous Sonar endpoints are intentionally absent.
 
 ### Decisions
 
+`createDecision()` also accepts [mixed named questions, including `locate`](examples/decisions/locateDecisionSpans.php),
+and [web-grounded questions](examples/decisions/createWebGroundedDecision.php). Web grounding can fetch a URL
+and adds billable Perplexity searches.
+
 | SDK method       | HTTP route           | Request body | Example                                      |
 |------------------|----------------------|--------------|----------------------------------------------|
 | `createDecision` | `POST /v1/decisions` | `json`       | [PHP](examples/decisions/createDecision.php) |
@@ -372,6 +413,12 @@ The retired Sonar and asynchronous Sonar endpoints are intentionally absent.
 |-------------------------------|------------------------------------|--------------|-----------------------------------------------------------|
 | `getComputerUsageAnalytics`   | `GET /v1/analytics/computer/usage` | `none`       | [PHP](examples/analytics/getComputerUsageAnalytics.php)   |
 | `getComputerUsageAnalyticsV2` | `GET /v2/analytics/computer/usage` | `none`       | [PHP](examples/analytics/getComputerUsageAnalyticsV2.php) |
+
+### Administration / Audit
+
+| SDK method | HTTP route | Request body | Example |
+| --- | --- | --- | --- |
+| `listAuditEvents` | `GET /v1/admin/audit-events` | `none` | [PHP](examples/administration/audit/listAuditEvents.php) |
 
 ## Custom API Origin
 
